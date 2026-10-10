@@ -1,0 +1,5 @@
+# OpenAI Codex adapter: picker metadata only. Instructions live in ../SKILL.md.
+interface:
+  display_name: "Flow: Scope"
+  short_description: "Plan the service scope, add a resource, report status"
+  default_prompt: "Run the flow-scope skill: read its SKILL.md, then plan the service scope, add a resource to it, or report where it stands, in docs/scope/scope.md."

@@ -1,0 +1,5 @@
+# OpenAI Codex adapter: picker metadata only. Instructions live in ../SKILL.md.
+interface:
+  display_name: "Flow: Verify"
+  short_description: "Prove every acceptance criterion with evidence"
+  default_prompt: "Run the flow-verify skill: read its SKILL.md, then verify the named resource against every acceptance criterion and write the report."

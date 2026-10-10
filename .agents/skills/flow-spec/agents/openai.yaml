@@ -1,0 +1,5 @@
+# OpenAI Codex adapter: picker metadata only. Instructions live in ../SKILL.md.
+interface:
+  display_name: "Flow: Spec"
+  short_description: "Grill and write a resource spec with ACs"
+  default_prompt: "Run the flow-spec skill: read its SKILL.md, then grill me on the named resource and write its spec in docs/specs/. Treat docs/conventions/ as read-only."

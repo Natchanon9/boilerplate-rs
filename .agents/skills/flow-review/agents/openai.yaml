@@ -1,0 +1,5 @@
+# OpenAI Codex adapter: picker metadata only. Instructions live in ../SKILL.md.
+interface:
+  display_name: "Flow: Review"
+  short_description: "Independent rule-based review"
+  default_prompt: "Run the flow-review skill: read its SKILL.md and checklist.md, then review the current change and write findings."

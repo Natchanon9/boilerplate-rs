@@ -1,0 +1,5 @@
+# OpenAI Codex adapter: picker metadata only. Instructions live in ../SKILL.md.
+interface:
+  display_name: "Flow: Sync"
+  short_description: "Reconcile statuses, docs, changelog"
+  default_prompt: "Run the flow-sync skill: read its SKILL.md, then reconcile scope, specs, AGENTS.md, and draft the changelog and PR body."
