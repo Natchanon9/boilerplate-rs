@@ -1,0 +1,8 @@
+target/
+.git/
+.env
+.secrets/
+.private/
+.claude/
+.agents/
+docs/

@@ -1,0 +1,4 @@
+# `cargo xtask <task>` runs the dev tasks in xtask/ (the cargo-xtask convention,
+# https://github.com/matklad/cargo-xtask).
+[alias]
+xtask = "run -q -p xtask --"

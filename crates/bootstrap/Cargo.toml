@@ -1,0 +1,43 @@
+[package]
+name = "bootstrap"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+# The CLI in docs/conventions/runtime.md is `app <command>`.
+name = "app"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+application = { workspace = true }
+axum = { workspace = true }
+clap = { workspace = true }
+dotenvy = { workspace = true }
+http-api = { workspace = true }
+infrastructure = { workspace = true }
+kafka-api = { workspace = true }
+secrecy = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal"] }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+http-body-util = { workspace = true }
+jsonwebtoken = { workspace = true }
+rdkafka = { workspace = true }
+redis = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+testcontainers-modules = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+tower = { workspace = true }
+
+[lints]
+workspace = true

@@ -23,6 +23,7 @@ The boilerplate has to be a template that AI tools follow strictly, and prompts 
 - **AC-5**: Invalid or missing config stops the app at startup with an error that names the env var. The error never prints a secret value.
 - **AC-6**: `GET /healthz` (liveness) and `GET /readyz` (DB, plus Redis when the cache is on) work on the hidden router ([runtime.md](runtime.md)).
 - **AC-7**: A single binary provides the subcommands in [runtime.md](runtime.md): `serve`, `consume`, `all` (for dev), `db migrate`, `db rollback`, `db seed`, `info env`, and `info features`. The database engine is pluggable through `DB_PLATFORM` ([database.md](database.md)).
+- **AC-8**: Every doc reference in a code comment resolves. `make ref-check`, part of `make verify`, fails when a comment cites a missing file or an ID the file no longer defines, and prints the comment's path and line.
 
 ## Options considered (summary)
 
@@ -71,6 +72,7 @@ migrations/        sqlx migrations
 | Messaging | Apache Kafka 4.x (KRaft), rdkafka |
 | IDs | UUIDv7, generated in the app: by the application use case for HTTP creates, and by the producer for Kafka creates (the id is needed before the insert, for events). Timestamps come from the database ([api.md](api.md)) |
 | Errors | `thiserror` in every library crate, `anyhow` only in bootstrap |
+| Code comments | A file's `//!` header names the convention it implements once. An item cites a rule only where the code makes a choice a reader might "fix" wrongly (security, timeouts, retries, fail-open, redaction); comments never narrate the code. One citation form, at the end of the sentence: `(<file>.md)` or `(<file>.md <ID>)`, several as `(cache.md C6, security.md SEC-6)`. `<file>` is a file in `docs/conventions/`, written bare, or `layers.md` with `section <n>`. IDs are `AC-<n>`, `SEC-<n>`, or a decisions-log ID such as `C9`. `make ref-check` enforces it (AC-8) (own proposal, accepted by the engineer 2026-10-11) |
 | Config | 12-factor env vars parsed into a typed `Config`, validated at startup, secrets wrapped with `secrecy` |
 | Observability | `tracing` (JSON logs) |
 | Tests | Unit tests use in-memory fakes of ports. Integration tests use `testcontainers` |
@@ -94,6 +96,7 @@ Each resource has its own module in every layer (a vertical slice inside each la
 4. bootstrap: `Config` + validation, the CLI, feature toggles, and tracing ([runtime.md](runtime.md)) (AC-5, AC-7)
 5. The three routers, with health and readiness on hidden (AC-6)
 6. CI (GitHub Actions) running `make verify` (AC-4)
+7. `make ref-check` in `make verify` (AC-8)
 
 ## Consequences
 - **Gain:** a layering mistake by an AI fails the build immediately, with no reliance on review.

@@ -1,0 +1,5 @@
+[toolchain]
+# Latest stable at scaffold time (2026-10-10). Bump deliberately, in its own commit.
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

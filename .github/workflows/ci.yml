@@ -1,0 +1,60 @@
+# Runs the same gate as local development: `make verify`
+# (docs/conventions/stack-architecture.md AC-4, security.md SEC-10).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_TERM_COLOR: always
+      # `cargo sqlx prepare --check` and the sqlx macros connect to this database.
+      DATABASE_URL: postgres://app:app@localhost:5432/app
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        # Health options from GitHub's PostgreSQL service example
+        # (https://docs.github.com/en/actions/tutorials/use-containerized-services/create-postgresql-service-containers).
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+
+      # Installs the toolchain pinned in rust-toolchain.toml, with rustfmt and clippy.
+      - run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      # rdkafka's cmake build includes <curl/curl.h> (see the Dockerfile for why).
+      - run: sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+
+      # Same versions as local development. cmake (for rdkafka) and Docker (for
+      # testcontainers) are preinstalled on the runner image.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.20.2,sqlx-cli@0.9.0
+
+      - name: Migrate the CI database
+        run: sqlx migrate run --source migrations/postgres
+
+      - run: make verify

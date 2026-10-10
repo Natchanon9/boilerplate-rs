@@ -1,0 +1,4 @@
+# SEC-11 applies outside tests only (docs/conventions/security.md)
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

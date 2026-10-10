@@ -1,0 +1,63 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[workspace.lints.rust]
+# SEC-11 (docs/conventions/security.md)
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+# SEC-11: no unwrap, expect, or panic outside tests (clippy.toml allows them in tests)
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+# Versions are the latest at scaffold time and are locked by Cargo.lock
+# (docs/conventions/stack-architecture.md, Stack).
+[workspace.dependencies]
+domain = { path = "crates/domain" }
+application = { path = "crates/application" }
+infrastructure = { path = "crates/infrastructure" }
+http-api = { path = "crates/http-api" }
+kafka-api = { path = "crates/kafka-api" }
+
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+axum = "0.8.9"
+base64 = "0.23.1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+dotenvy = "0.15.7"
+# HS256 needs no PEM support. Exactly one crypto backend must be enabled, or signing and
+# verifying panic at runtime (jsonwebtoken `CryptoProvider`). `aws_lc_rs`, because
+# `rust_crypto` pulls in `rsa`, which fails `cargo deny` (RUSTSEC-2023-0071, no patch).
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs"] }
+# cmake-build compiles librdkafka from source (needs cmake; docs/conventions/stack-architecture.md,
+# Consequences). `tokio` is the runtime for StreamConsumer and FutureProducer. The default
+# `libz` feature is off, so no zlib is linked: the consumer cannot read gzip-compressed batches,
+# which our own producers never write.
+rdkafka = { version = "0.39.0", default-features = false, features = ["cmake-build", "tokio"] }
+redis = { version = "1.7.1", default-features = false, features = ["tokio-comp", "connection-manager"] }
+secrecy = "0.10.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "time"] }
+thiserror = "2.0.21"
+time = { version = "0.3.55", features = ["formatting", "parsing"] }
+# No features here: each crate enables what it needs, so application can take `rt` alone.
+tokio = "1.53.2"
+tokio-util = "0.7.20"
+tower-http = { version = "0.7.1", features = ["trace"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
+url = "2.5.8"
+uuid = { version = "1.28.0", features = ["v7"] }
+
+# Test-only
+http-body-util = "0.1.5"
+testcontainers-modules = { version = "0.15.0", features = ["kafka", "postgres", "redis"] }
+tower = { version = "0.5.3", features = ["util"] }

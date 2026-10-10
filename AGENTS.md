@@ -22,7 +22,7 @@ The boilerplate ships with no resource. Add your first one with `/flow-spec <res
 |---------|------|
 | `make up` | Creates `.env` (with a random `AUTH_JWT_SECRET`) if missing, then starts postgres, migrations, and the app, plus redis with `ENABLE_FEATURES=cache` and kafka, kafka-ui with `ENABLE_FEATURES=kafka` in `.env` (it sets the compose profiles `cache` and `kafka` from that one switch; a fresh clone has neither) |
 | `make down` / `make logs` | Stops the stack, every profile / follows the app logs |
-| `make verify` | **The gate.** fmt, clippy `-D warnings`, tests, `cargo deny`, `cargo sqlx prepare --check`, and the SEC-8 SQL check. Needs `make up` first (a live database and Docker) |
+| `make verify` | **The gate.** fmt, clippy `-D warnings`, tests, `cargo deny`, `cargo sqlx prepare --check`, the SEC-8 SQL check, and the doc-reference check. Needs `make up` first (a live database and Docker) |
 | `make migrate` / `make seed` | `app db migrate` / `app db seed` against the local database |
 | `cargo xtask token --sub <sub> --scope "<scopes>" [--ttl 1h]` | Prints a dev access token signed with `AUTH_JWT_SECRET`, `AUTH_ISSUER`, and `AUTH_AUDIENCE` from the environment or `.env`. Use it as `Authorization: Bearer <token>` |
 | `cargo xtask kafka-produce --type <res>.<op> --payload '<json>' [--repeat N]` | Sends a command envelope to `<res>s.commands.v1` (key = `payload.id`; a create without `id` gets a UUIDv7) and prints the `message_id` and key. `--raw '<text>' --key <k> --type <t>` sends an unchecked value for the DLQ demo. Reads `KAFKA_BROKERS` from the environment or `.env` |
@@ -55,6 +55,7 @@ The full crate map is in [stack-architecture.md](docs/conventions/stack-architec
 - **Dependency rule.** Inner crates never name outer crates or frameworks. `deny.toml` bans enforce it. Never work around a ban with a feature flag, a re-export, or a new wrapper entry.
 - **No panics outside tests** (SEC-11): `unwrap`, `expect`, and `panic!` are denied by `[workspace.lints]`; `unsafe` is forbidden. Integration-test files start with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`, because `clippy.toml` only covers `#[test]` functions.
 - **SQL** (SEC-8): only `sqlx::query!` / `query_as!`, or a `&'static str` with bound parameters. `AssertSqlSafe`, `QueryBuilder`, and SQL in `format!` fail `make sql-check`. The seed runner in `crates/infrastructure/src/postgres/mod.rs` is the only exception.
+- **Doc references:** a code comment cites rules as `(<file>.md <ID>)`, for example `(security.md SEC-9)`. `make ref-check` fails when the file or the ID no longer exists ([stack-architecture.md](docs/conventions/stack-architecture.md), Code comments).
 - **Errors:** `thiserror` in every library crate. `anyhow` only in `bootstrap` (a `deny.toml` ban).
 - **Secrets** (SEC-9): wrap them in `secrecy::SecretString`, never log or print them, and mark their clap args `hide_env_values = true`. `info env` must redact them.
 - **Green before success:** never report work as done unless `make verify` passes. Quote failures verbatim.

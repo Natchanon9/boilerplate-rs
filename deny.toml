@@ -1,0 +1,63 @@
+# cargo-deny configuration: SEC-10 (docs/conventions/security.md) and the
+# dependency rule (docs/conventions/stack-architecture.md, AC-2).
+# Runs in `make verify` and CI.
+
+[graph]
+all-features = true
+
+[advisories]
+# Defaults: every vulnerability and unmaintained advisory fails the check.
+ignore = []
+
+[licenses]
+# Permissive licenses only. Add one here only after checking it is compatible.
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "ISC",
+  "MIT",
+  "Unicode-3.0",
+  "Zlib",
+]
+confidence-threshold = 0.8
+
+[licenses.private]
+# Workspace crates are `publish = false` and carry no license.
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+# The dependency rule, enforced mechanically. `wrappers` lists the only crates
+# allowed to depend *directly* on the banned crate, so `domain` and `application`
+# can reach none of these, either directly or through an outer workspace crate.
+# Third-party wrappers (tonic, prost-derive) come from testcontainers, a test-only
+# dependency of bootstrap.
+deny = [
+  # Outer workspace crates: only the composition root may depend on them.
+  { crate = "infrastructure", wrappers = ["bootstrap"], reason = "only bootstrap wires infrastructure" },
+  { crate = "http-api", wrappers = ["bootstrap"], reason = "only bootstrap wires inbound adapters" },
+  { crate = "kafka-api", wrappers = ["bootstrap"], reason = "only bootstrap wires inbound adapters" },
+  { crate = "application", wrappers = ["infrastructure", "http-api", "kafka-api", "bootstrap"], reason = "domain must not depend on application" },
+
+  # Frameworks (AC-2): never in domain or application.
+  { crate = "axum", wrappers = ["tonic", "http-api", "bootstrap"], reason = "HTTP framework lives in http-api" },
+  { crate = "tower", wrappers = ["axum", "tonic", "http-api", "bootstrap"], reason = "HTTP middleware lives in http-api" },
+  { crate = "tower-http", wrappers = ["http-api"], reason = "HTTP middleware lives in http-api" },
+  { crate = "sqlx", wrappers = ["infrastructure"], reason = "database access lives in infrastructure" },
+  { crate = "redis", wrappers = ["infrastructure", "testcontainers-modules", "bootstrap"], reason = "cache access lives in infrastructure" },
+  { crate = "rdkafka", wrappers = ["infrastructure", "kafka-api", "xtask", "bootstrap"], reason = "Kafka clients live in infrastructure and kafka-api; xtask is a dev tool, never a dependency of the app, and its kafka-produce task sends demo messages" },
+
+  # anyhow is for the composition root only (stack-architecture.md, Errors).
+  { crate = "anyhow", wrappers = ["prost-derive", "bootstrap"], reason = "library crates use thiserror" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

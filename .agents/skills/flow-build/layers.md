@@ -1,7 +1,7 @@
 # Layers reference (Rust, clean architecture)
 
 This file is derived from [docs/conventions/stack-architecture.md](../../../docs/conventions/stack-architecture.md), and covers the MVP only. When that convention changes, update this file in the same commit. Never build anything a convention lists under `## Deferred`.
-`<res>` is the resource module name, singular snake_case (`product`). `<Res>` is the type name (`Product`). `<res_plural>` is the route and table name (`products`).
+`<res>` is the resource module name, singular snake_case (`widget`). `<Res>` is the type name (`Widget`). `<res_plural>` is the route and table name (`widgets`).
 
 ## Dependency rule
 
@@ -331,6 +331,9 @@ let handlers: Vec<Arc<dyn CommandHandler>> = vec![
 - Use testcontainers for Postgres, Redis, and Kafka as needed.
 - Write one or more tests for each AC, named `ac_<n>_<behavior>`. Cover the conventions from [docs/conventions/api.md](../../../docs/conventions/api.md): 201 and Location, 404, 422 with field codes, and pagination.
 - Tests must be deterministic: no sleeps for ordering, and every await on the system under test has a timeout.
+
+## Comments
+- Follow the Code comments row in [stack-architecture.md](../../../docs/conventions/stack-architecture.md): cite the convention once in the module's `//!` header, cite a rule on an item only where the choice is not obvious, and use the form `(<file>.md <ID>)`. `make ref-check` fails on a reference that does not resolve.
 
 ## Forbidden everywhere (a review blocker)
 - `unwrap`, `expect`, or `panic!` outside tests
