@@ -103,6 +103,12 @@ domain  <-  application  <-  infrastructure   (postgres/, redis/)
 
 Details: [stack-architecture.md](docs/conventions/stack-architecture.md).
 
+### Deployment shape
+
+![Production deployment overview: an api deployment (app serve) and a worker deployment (app consume) share one image, Postgres, and Redis; only the worker talks to Kafka](docs/images/service-flow.png)
+
+One image runs as `app serve` (HTTP) and `app consume` (Kafka) in separate deployments in production; `app all` runs both in one process for local use. A Kafka producer adapter is deferred.
+
 ## Adding a resource
 
 1. `/flow-spec <resource>`: interview you, write `docs/specs/NNNN-<slug>.md` with acceptance criteria, and add the scope row.
@@ -135,3 +141,4 @@ make verify
 
 - Valkey works as a drop-in replacement for Redis.
 - The Redis and Kafka code is present but inert unless enabled in `ENABLE_FEATURES`; compiling it out was deferred. See "Deferred" in [cache.md](docs/conventions/cache.md) and [kafka.md](docs/conventions/kafka.md) for the reasons and next steps.
+- The app's only Kafka producer today is the DLQ writer in `kafka-api`. Events, replies, and an HTTP handler that publishes a command to Kafka are deferred; when they land they will share one producer adapter in `infrastructure` behind a port in `application` ([kafka.md](docs/conventions/kafka.md), "One producer adapter for everything the app publishes").

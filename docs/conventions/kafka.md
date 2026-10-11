@@ -200,6 +200,9 @@ Designed and decided, then cut on 2026-10-10 to keep the MVP small. The original
 - If the publish fails after the commit, the service logs it and increments `events_publish_failures_total`, and the write still succeeds. This is the dual-write loss accepted above.
 - The repository's insert reports `Inserted` or `AlreadyExists(entity)`. A duplicate create therefore replies with the current state and emits no event (K5). Deleting a missing row, and replaying an update to an equal state, also succeed without an event.
 
+#### One producer adapter for everything the app publishes
+**Deferred** with Events and Replies. When the app gets a producer, build one Kafka producer adapter in `infrastructure` behind a port in `application` (the `EventPublisher` above), and let every outbound publish share it instead of creating its own. That covers events, replies, and an HTTP handler that accepts a request, publishes a command, and lets the consumer process it later. The DLQ writer in `kafka-api` stays separate, because its only caller is the consumer and it handles messages the consumer rejected. The accept-then-process-later case also needs a way to tell the caller the result, such as a status resource or a reply; that is a per-resource decision for `/flow-spec`, not a boilerplate default.
+
 
 ### Retry with backoff (AC-4, K4)
 **Deferred:** a retry budget needs measured timeouts ([api.md](api.md), N8). **MVP uses:** failures go straight to the DLQ, and the DLQ can be replayed.

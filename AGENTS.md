@@ -62,6 +62,7 @@ The full crate map is in [stack-architecture.md](docs/conventions/stack-architec
 
 ## Conventions you will need
 
+- **Secret files:** never read, print, copy, or edit `.env` or its variants (`.env.local`, `.env.production`, and so on). `.env.example` is the only one you may read. To learn which settings exist, use `.env.example`, `crates/bootstrap/src/config.rs`, or `app info env` (it redacts secrets). Claude Code enforces this in `.claude/settings.json`; other tools rely on this rule.
 - **Config:** each setting is a clap arg with `env = "NAME"` in `crates/bootstrap/src/config.rs`; precedence is flag > env > `.env`. Each command resolves only the settings it needs, and errors name the env var. Add new settings to `.env.example` and to `Settings::redacted_env`.
 - **Logging:** the filter comes from `LOG_LEVEL`, a tracing `EnvFilter` directive (`info`, `info,sqlx=warn`). `RUST_LOG` is not read.
 - **Features:** `ENABLE_FEATURES=cache,kafka`, empty by default, so both are off ([runtime.md](docs/conventions/runtime.md)). Wiring checks `Settings::cache()` / `kafka()`, which return `None` when the feature is off.
@@ -90,5 +91,6 @@ Resource code reuses these and never copies them ("Generic first" in `flow-build
 | JWT auth (`JwtVerifier`, `Principal`), `RequireScope`, `xtask token` | `crates/http-api/src/auth.rs`, `crates/bootstrap/src/wiring.rs` (`jwt_verifier`), `xtask/src/token.rs` | built |
 | `cache_aside::{RedisCache, get_or_load, invalidate}`, `cache_status`, `X-Cache` middleware, debug-header production guard | `crates/infrastructure/src/redis/cache_aside.rs`, `crates/application/src/cache_status.rs`, `crates/http-api/src/x_cache.rs`, `crates/bootstrap/src/wiring.rs` (`redis_cache`, `protected_router`), `Settings::cache_debug_header` | built |
 | Kafka envelope parser, `CommandHandler`, dispatcher, single-loop consumer, DLQ writer, `DlqReason`, `payload::decode`, `xtask kafka-produce` | `crates/kafka-api/src/{envelope,handler,dispatcher,consumer,dlq,reason,payload}.rs`, `crates/bootstrap/src/{wiring.rs (kafka_handlers),commands/run.rs}`, `xtask/src/produce.rs` ([kafka.md](docs/conventions/kafka.md)) | built |
+| Kafka producer adapter for events, replies, and HTTP-to-Kafka publishing (`EventPublisher` port in `application`, one adapter in `infrastructure`) | `crates/infrastructure/` (planned) | not built yet (deferred, [kafka.md](docs/conventions/kafka.md)). The DLQ writer is a separate block and is built |
 
 If a resource needs a block marked "not built yet", `flow-build` stops and reports a boilerplate gap. Building it is hand work on the conventions, not part of a resource build.
