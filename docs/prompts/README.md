@@ -1,6 +1,6 @@
 # Prompts
 
-Example prompts for people who use this boilerplate, and the exact prompts used in the demo video. They are written for humans to copy. Flow skills do not read this folder, and nothing here is an instruction to a skill.
+Example prompts for people who use this boilerplate. They are written for humans to copy. Flow skills do not read this folder, and nothing here is an instruction to a skill.
 
 ## Order of work for one resource
 
@@ -23,5 +23,5 @@ Every resource goes through all four steps, in this order.
 | File | Use it for |
 |------|-----------|
 | [add-resource.md](add-resource.md) | Adding any resource, step by step, with the files each step produces |
-| [demo-music.md](demo-music.md) | The demo video run sheet: `music` built from the bare boilerplate, plus the cache on/off step |
+| [demo-tracks.md](demo-tracks.md) | A run sheet: `tracks` built from the bare boilerplate, with the cache shown through `X-Cache` |
 | [negative-tests.md](negative-tests.md) | Prompts that deliberately break the rules, and what should happen |

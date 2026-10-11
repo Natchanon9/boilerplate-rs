@@ -1,7 +1,7 @@
 # Toggleable cache-aside with Redis
 
 **Date**: 2026-10-09 (cut to MVP on 2026-10-10)
-**Status**: Proposed
+**Status**: Accepted
 **Kind**: capability
 **Built in**: [assignment feature 6](../assignment/scope.md)
 
@@ -15,13 +15,13 @@ The brief asks for cache-aside, a delete after each write, and the ability to tu
 
 ## Requirements
 
-- **AC-1**: With the `cache` feature enabled (the default), the first GET is a MISS and the next one is a HIT (visible in `X-Cache` and in the logs). HIT, MISS, and ERROR are `debug` events, so the demo runs with `LOG_LEVEL=info,infrastructure=debug` (decided 2026-10-10).
+- **AC-1**: With the `cache` feature enabled in `ENABLE_FEATURES` ([runtime.md](runtime.md); it is off by default), the first GET is a MISS and the next one is a HIT (visible in `X-Cache` and in the logs). HIT, MISS, and ERROR are `debug` events, so the demo runs with `LOG_LEVEL=info,infrastructure=debug` (decided 2026-10-10).
 - **AC-2**: After a successful `PUT` or `DELETE`, the next GET is a MISS and returns the new value (or 404).
 - **AC-3**: Without `cache` in `ENABLE_FEATURES` ([runtime.md](runtime.md)), the default, every request is a BYPASS, and Redis holds no app keys.
 - **AC-4**: If Redis is down, the API still returns 200 (fail-open) and logs a warning.
 - **AC-5**: TTL is `CACHE_TTL_SECS`, default 300 s ([api.md](api.md), MVP limits). A resource spec may set its own TTL:
   - The decorator takes `ttl: Duration` at construction. Wiring passes `CACHE_TTL_SECS` by default.
-  - A resource whose spec sets its own TTL passes a constant instead, and the constant links to that spec (for example `pub const PRODUCT_CACHE_TTL: Duration = ...; // docs/specs/0001-products.md`).
+  - A resource whose spec sets its own TTL passes a constant instead, and the constant links to that spec (for example `pub const WIDGET_CACHE_TTL: Duration = ...; // docs/specs/NNNN-widgets.md`).
   - There are no per-resource env vars (decided 2026-10-10).
 
 AC-6 and AC-7 are deferred.
@@ -55,16 +55,7 @@ Option A, made of these parts:
 | `X-Cache` header | `HIT`, `MISS`, `ERROR` (Redis failed and the read fell back to the DB), or `BYPASS` (the `cache` feature is not enabled) (C6). The decorator records the outcome in a `tokio::task_local!` slot (`application::cache_status`), and the `x_cache` middleware on the protected router turns it into the header. Enabled only with `CACHE_DEBUG_HEADER=true`. The app refuses to start with `CACHE_DEBUG_HEADER=true` and `APP_ENV=production`; `production` is the reserved value, matched in any letter case (own proposal) |
 | Which responses carry `X-Cache` | Only authenticated `GET`s on a matched route. With the cache enabled, only a response whose request read the cache (get by id) carries it, so lists and writes do not. With the cache disabled there is no decorator, so the middleware reports `BYPASS` on every such `GET`, lists included (AC-3). A `401` or `403` never carries it, in any mode, so `BYPASS` never appears on an auth rejection (decided 2026-10-10). Outside an HTTP request (Kafka), recording the outcome does nothing |
 
-### Demo measurement (MVP)
-A single comparison for the video, with no budget and no report format (own proposal: shows the cache's effect without the deferred perf method):
-1. Create one row of the example resource, and get a token with `cargo xtask token`.
-2. With the cache enabled, run `oha -z 30s -q <rate> --latency-correction -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/<resources>/<id>` against that one id (a hot key).
-3. Restart without `cache` in `ENABLE_FEATURES`, and run the same command at the same `<rate>`.
-4. Show both outputs side by side in the video.
-
-`<rate>` is picked at recording time as a rate the machine sustains with the cache off, and it is stated in the video (measured). The 30 s duration is an own proposal: long enough for stable percentiles, short enough for the video. `-q` with `--latency-correction` avoids coordinated omission ([oha README](https://github.com/hatoo/oha)).
-
-## Known trade-offs (covered in the video)
+## Known trade-offs
 
 1. **The cache-aside race.** Reader A misses and reads the old value from the DB. Writer B commits and deletes the key. Reader A then writes the old value back. The value stays stale until the TTL expires. The mitigation is a short TTL. Delayed double delete is deferred.
 2. **Cache stampede** on a hot key at expiry. TTL jitter and XFetch are both deferred.
@@ -77,7 +68,6 @@ A single comparison for the video, with no budget and no report format (own prop
 3. Decorator for the walking-skeleton resource, and the toggle in wiring (AC-1, AC-2, AC-3)
 4. `X-Cache` task-local + middleware (AC-1)
 5. Integration tests with testcontainers, including stopping the Redis container mid-test (AC-1 to AC-4)
-6. The demo measurement above, recorded for the video
 
 ## Open questions
 
@@ -89,7 +79,7 @@ A single comparison for the video, with no budget and no report format (own prop
 
 | # | Question | Decision |
 |---|----------|----------|
-| C1 | Serialize values as JSON, or as MessagePack/bincode? | JSON. It is debuggable with `redis-cli`, which helps in the video, and CRUD payloads are small, so the perf difference is negligible |
+| C1 | Serialize values as JSON, or as MessagePack/bincode? | JSON. It is debuggable with `redis-cli`, which helps in the demo, and CRUD payloads are small, so the perf difference is negligible |
 | C2 | Default TTL | 300 s, own proposal ([api.md](api.md), MVP limits). Jitter is deferred |
 | C3 | Toggle at startup only, or at runtime too? | Startup only, because it is simple and safe. The demo restarts the container |
 | C4 | What happens to a cached value that fails to decode? | Decided 2026-10-10 (engineer): it counts as a MISS. Log a warning, load from the DB, and `SET` the fresh value over it. The client still gets 200 |
@@ -101,7 +91,20 @@ A single comparison for the video, with no budget and no report format (own prop
 
 ## Deferred
 
-Designed and decided, then cut on 2026-10-10 so the MVP ships by 14 Oct. The original text is kept.
+Designed and decided, then cut on 2026-10-10 to keep the MVP small. The original text is kept.
+
+### Demo measurement (oha cache on/off)
+**Deferred** on 2026-10-12 (engineer decision): the demo shows the cache through `X-Cache` (MISS, HIT, invalidation, and `ERROR` with Redis stopped), which proves AC-1 to AC-4 without a load run. **MVP uses:** no load measurement.
+
+Original text:
+
+A single comparison for the demo, with no budget and no report format (own proposal: shows the cache's effect without the deferred perf method):
+1. Create one row of the example resource, and get a token with `cargo xtask token`.
+2. With the cache enabled, run `oha -z 30s -q <rate> --latency-correction -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/<resources>/<id>` against that one id (a hot key).
+3. Restart without `cache` in `ENABLE_FEATURES`, and run the same command at the same `<rate>`.
+4. Show both outputs side by side.
+
+`<rate>` is picked when the comparison is run, as a rate the machine sustains with the cache off, and it is stated with the results (measured). The 30 s duration is an own proposal: long enough for stable percentiles, short enough for a live demo. `-q` with `--latency-correction` avoids coordinated omission ([oha README](https://github.com/hatoo/oha)).
 
 ### Removing Redis from the whole project
 **Deferred** on 2026-10-10 (engineer decision): a clean boilerplate should not make a project carry Redis it never chose. The MVP keeps the cache code in the repository, switched off by default, because the brief asks for a CRUD API whose Redis cache can be toggled on or off. Two ways to go further, in order of cost:
@@ -133,11 +136,11 @@ Original text:
 - **AC-6**: Get by id over Kafka ([docs/conventions/kafka.md](kafka.md)) uses the same cache path.
 
 ### Perf gate (AC-7)
-**Deferred:** depends on the deferred perf method ([api.md](api.md), Deferred). **MVP uses:** the demo measurement above.
+**Deferred:** depends on the deferred perf method ([api.md](api.md), Deferred). **MVP uses:** no load measurement; the demo shows the cache through `X-Cache` (see Demo measurement above).
 
 - **AC-7 (perf)**: At the same arrival rate, the hot-key GET `T99` with the cache on is below the cache-off GET `T99` (the cache gate in [docs/conventions/api.md](api.md)). In the hot-key scenario, every request after the first is a HIT until the TTL expires. Any other MISS is a bug, not a budget question.
 
-Original build plan step: `6. Perf scenarios P1 and P2, run as part of /flow-verify products perf (AC-7)`.
+Original build plan step: `6. Perf scenarios P1 and P2, run as part of /flow-verify widgets perf (AC-7)`.
 
 Original trade-offs text (before the cut):
 

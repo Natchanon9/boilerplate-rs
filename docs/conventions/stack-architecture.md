@@ -1,7 +1,7 @@
 # Rust workspace with clean architecture
 
 **Date**: 2026-10-09 (cut to MVP on 2026-10-10)
-**Status**: Proposed
+**Status**: Accepted
 **Kind**: architecture
 **Built in**: [assignment feature 2](../assignment/scope.md)
 
@@ -44,11 +44,11 @@ The boilerplate has to be a template that AI tools follow strictly, and prompts 
 crates/
   domain/          Entities, value objects, domain errors, domain events      (no IO)
   application/     Use cases + ports (repository and publisher traits)         depends on: domain
-  infrastructure/  Postgres repos, Redis cache decorator, Kafka producer       depends on: application, domain
+  infrastructure/  Postgres repos, Redis cache decorator                       depends on: application, domain
   http-api/        Inbound adapter: axum routes, DTOs, problem+json           depends on: application, domain
-  kafka-api/       Inbound adapter: consumer, envelope, DLQ                   depends on: application, domain
+  kafka-api/       Inbound adapter: consumer, envelope, DLQ producer           depends on: application, domain
   bootstrap/       main, config, wiring (composition root), subcommands        depends on: all
-xtask/             Dev tasks: check-skills, seed, token, perf helpers
+xtask/             Dev tasks: token, kafka-produce
 migrations/        sqlx migrations
 ```
 
@@ -66,7 +66,7 @@ migrations/        sqlx migrations
 | Layer | Choice |
 |-------|--------|
 | Language | Rust stable (pinned in `rust-toolchain.toml`), edition 2024 |
-| HTTP | axum + tower-http (trace, limit) |
+| HTTP | axum, with its `DefaultBodyLimit` as the body limit ([api.md](api.md), MVP limits), + tower-http with the `trace` feature only |
 | DB | PostgreSQL 18, sqlx. Local builds and CI compile online against Postgres (the sqlx default when `DATABASE_URL` is set). The offline query data in `.sqlx/` lets the Docker build compile without a DB. `cargo sqlx prepare --check` connects to a live DB ([sqlx-cli](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md)), so CI runs a Postgres service for AC-4 |
 | Cache | Redis 8 (Valkey works as a drop-in replacement) |
 | Messaging | Apache Kafka 4.x (KRaft), rdkafka |
@@ -76,14 +76,13 @@ migrations/        sqlx migrations
 | Config | 12-factor env vars parsed into a typed `Config`, validated at startup, secrets wrapped with `secrecy` |
 | Observability | `tracing` (JSON logs) |
 | Tests | Unit tests use in-memory fakes of ports. Integration tests use `testcontainers` |
-| Demo load | `oha`, for the single cache on/off comparison in the video ([cache.md](cache.md)) |
 | Local env | docker compose and a Makefile |
 
 Crate versions are the latest at scaffold time and are locked by `Cargo.lock`. The spec does not list versions, so it does not go stale.
 
 ### Use case style
 
-Each resource has its own module in every layer (a vertical slice inside each layer), for example `application/src/product/`. Its use cases live in one struct, `<Res>UseCases`, which holds `Arc<dyn Port>` fields and has the methods `create`, `get`, `list`, `update`, and `delete`. See O1.
+Each resource has its own module in every layer (a vertical slice inside each layer), for example `application/src/widget/`. Its use cases live in one struct, `<Res>UseCases`, which holds `Arc<dyn Port>` fields and has the methods `create`, `get`, `list`, `update`, and `delete`. See O1.
 
 ### Error flow
 
@@ -113,16 +112,16 @@ Each resource has its own module in every layer (a vertical slice inside each la
 
 | # | Question | Decision |
 |---|----------|----------|
-| O1 | One use case struct per resource, or one struct per use case (`CreateProduct`, ...)? | One per resource. It is easier to read, and the AI imitates it reliably. Split it later if use cases grow complex |
+| O1 | One use case struct per resource, or one struct per use case (`CreateWidget`, ...)? | One per resource. It is easier to read, and the AI imitates it reliably. Split it later if use cases grow complex |
 | O2 | Run the Kafka consumer as a separate process, or together with HTTP? | One binary with separate subcommands, so each scales independently. `all` is for dev |
 | O3 | Redis 8 or Valkey? | Redis 8, since it matches the brief. Note in the README that Valkey works as a drop-in |
 
 ## Deferred
 
-Designed and decided, then cut on 2026-10-10 so the MVP ships by 14 Oct. The original text is kept.
+Designed and decided, then cut on 2026-10-10 to keep the MVP small. The original text is kept.
 
 ### OpenAPI, metrics, request-id propagation, and query plans
-**Deferred:** none of them is needed to demo the brief, and each adds code to every route or crate. **MVP uses:** JSON logs through `tracing`, request examples in the README, and one `oha` run for the video.
+**Deferred:** none of them is needed to demo the brief, and each adds code to every route or crate. **MVP uses:** JSON logs through `tracing`, and request examples in the README.
 
 Original rows:
 

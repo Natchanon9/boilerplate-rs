@@ -2,4 +2,4 @@
 interface:
   display_name: "Flow: Build"
   short_description: "Implement a spec layer by layer"
-  default_prompt: "Run the flow-build skill: read its SKILL.md and layers.md, then implement the named resource from its spec, mirroring the products reference implementation."
+  default_prompt: "Run the flow-build skill: read its SKILL.md and layers.md, then implement the named resource from its spec, mirroring the project's first resource once one exists, otherwise layers.md."

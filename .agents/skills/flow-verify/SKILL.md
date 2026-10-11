@@ -11,7 +11,7 @@ It writes `docs/reports/NNNN-<slug>-verify.md`, appending each run under a dated
 
 ## Preconditions
 - `make verify` passes. If it does not, stop and report the failure.
-- `docker compose up -d` is running, and `curl http://127.0.0.1:8079/readyz` (the hidden router, [runtime.md](../../../docs/conventions/runtime.md)) returns 200.
+- `make up` has started the stack (plain `docker compose up` also needs `COMPOSE_PROFILES` set by hand, [runtime.md](../../../docs/conventions/runtime.md)), and `curl http://127.0.0.1:8079/readyz` (the hidden router, [runtime.md](../../../docs/conventions/runtime.md)) returns 200.
 - Optional demo data is loaded with `app db seed`.
 
 ## Steps
@@ -42,6 +42,6 @@ If the spec disables a capability (for example no cache, or no Kafka commands), 
 ## YYYY-MM-DD HH:MM, commit <sha>
 | AC | Result | Evidence |
 |----|--------|----------|
-| AC-1 | PASS | `HTTP/1.1 201`, Location: /api/v1/products/0192... |
+| AC-1 | PASS | `HTTP/1.1 201`, Location: /api/v1/widgets/0192... |
 Summary: <n> pass, <n> fail, <n> not run. Next: <step>
 ```

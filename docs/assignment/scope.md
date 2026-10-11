@@ -6,9 +6,9 @@ A Rust CRUD service boilerplate built on clean architecture. It has a Redis cach
 It is a take-home assignment deliverable, and it is also meant to be a real project foundation.
 
 **Build approach:** Tracer Bullet. Get one thin slice through every layer working first (HTTP > use case > Postgres > Redis > Kafka), then thicken it.
-**Workflow tier (default):** `standard` (build, then verify). Core features are tagged `production`, which adds perf verification and review. (Tiers were removed at the MVP cut on 2026-10-10; see the Decisions log.)
+**History note (2026-10-11):** this file is the build history. Its older formats are kept as they were and no longer apply: the `Tier` column and the `Workflow tier` / `production` wording (tiers were removed at the MVP cut on 2026-10-10), the `Perf it` and `Sync it` boxes (their skills are in [deferred-skills/](deferred-skills/README.md)), and the Timeline's old resource names and the `example/products` branch. The shipped flow is spec, build, verify, review.
 
-_Features 1 to 4, 6, and 7 are build-time work, done with [docs/conventions/](../conventions/README.md) and chat. Flow skills are not used for them (they are narrowed to resource work), so their boxes are plain tasks. Feature 5 is resource work, tracked in the service scope (feature 8 was dropped and merged into it)._
+_Features 1 to 4, 6, and 7 are build-time work, done with [docs/conventions/](../conventions/README.md) and chat. Flow skills are not used for them (they are narrowed to resource work), so their boxes are plain tasks. Feature 5 is resource work, tracked in the service scope._
 
 _Every step is a recommendation. Skip what you already know how to do. Any load-bearing decision is always written down in a spec. You decide when a feature is `done`._
 
@@ -19,22 +19,18 @@ _Every step is a recommendation. Skip what you already know how to do. Any load-
 | D1: CRUD API with a Redis cache that can be toggled on or off | 5, 6 |
 | D2: An alternative transport to HTTP (our own proposal) | 7 |
 | D3: Skills that make AI tools follow the boilerplate strictly, across tools | 1, 5 |
-| D4: A demo video | 9 |
-| D5: Email the submission with links by "next Wednesday" | 9 |
 
 ## At a glance
 
 | # | Feature | Phase | Tier | Status |
 |---|---------|-------|------|--------|
-| 1 | Workflow skills | Foundation | production | in-progress |
-| 2 | Stack & architecture | Foundation | production | in-progress |
-| 3 | API conventions | Foundation | standard | in-progress |
-| 4 | Security baseline | Foundation | production | in-progress |
-| 5 | Walking skeleton: music | Slice 1 | production | planned |
-| 6 | Cache-aside toggle | Slice 2 | production | in-progress |
-| 7 | Kafka transport | Slice 3 | production | in-progress |
-| 8 | Dogfood: AI builds a second resource | Slice 4 | standard | dropped |
-| 9 | Demo video & submission | Delivery | | planned |
+| 1 | Workflow skills | Foundation | production | in-progress: four skills ship; `cargo xtask check-skills` is planned |
+| 2 | Stack & architecture | Foundation | production | in-progress: building blocks built; resource-level checks run with the example resource |
+| 3 | API conventions | Foundation | standard | in-progress: building blocks built; resource-level checks run with the example resource |
+| 4 | Security baseline | Foundation | production | in-progress: building blocks built; resource-level checks run with the example resource |
+| 5 | Walking skeleton: tracks | Slice 1 | production | done |
+| 6 | Cache-aside toggle | Slice 2 | production | in-progress: AC-1 to AC-4 pass end to end with tracks |
+| 7 | Kafka transport | Slice 3 | production | in-progress: building blocks built and tested with a dummy handler; not part of the demo (2026-10-12), so no resource proves AC-1 and AC-2 end to end |
 
 ## Foundations
 
@@ -83,29 +79,29 @@ A cross-cutting security standard, mapped to the OWASP API Security Top 10 and e
    - [x] Infrastructure + adapters (SEC-1, SEC-2, SEC-5, SEC-6, SEC-9): auth, limits, headers, secrets. Built: JWT auth, `RequireScope`, `xtask token` (SEC-1, SEC-2), body limit and page cap (SEC-5), no internal detail in errors, `X-Cache` only with `CACHE_DEBUG_HEADER=true`, and no start with it under `APP_ENV=production` (SEC-6), secret types, redaction, and no header logging (SEC-9). Security headers are deferred
    - [ ] Wiring + integration tests (SEC-8, SEC-10, SEC-11, SEC-12): lints, audits, container
 - [ ] Verify it (check the convention's ACs on the running stack)
-- [x] Perf it: (deferred at the MVP cut; the video shows one `oha` cache on/off comparison)
+- [x] Perf it: (deferred at the MVP cut; no load measurement in the demo, decision of 2026-10-12)
 - [ ] Review it (fresh session, using `.agents/skills/flow-review/checklist.md`)
 - [ ] Sync it (update this file and the decisions log)
 [docs/conventions/security.md](../conventions/security.md)
 
 ## Slice 1: Walking skeleton
 
-### 5. Walking skeleton: music
-The first resource, a simple CRUD wired end to end through every layer, with the cache and the Kafka commands (create, update, delete). It proves the stack is connected. The engineer designs its fields with `/flow-spec music`, and the video shows `/flow-spec music` and then `/flow-build music` running from the bare boilerplate on the `example/music` branch ([docs/prompts/demo-music.md](../prompts/demo-music.md)). It replaces the earlier `products` example.
+### 5. Walking skeleton: tracks
+The first resource, a simple CRUD of music tracks (title, artist, duration) wired end to end through every layer, with the cache. It has no Kafka commands: Kafka is not part of the demo (decision of 2026-10-12). It proves the stack is connected. The engineer designed its fields with `/flow-spec tracks`, and the demo runs `/flow-spec tracks` and then `/flow-build tracks` from the bare boilerplate ([docs/prompts/demo-tracks.md](../prompts/demo-tracks.md)). The finished result is on the `example/track` branch, one commit per flow step. It replaces the earlier `products` and `music` examples.
 **Done when:** all five CRUD operations work over HTTP against the real database, every AC has an integration test, and the feature was built through the flow skills.
-- [ ] Tracked as feature 1 in the service scope: [docs/scope/scope.md](../scope/scope.md), with its spec in [docs/specs/](../specs/)
+- [x] Tracked as feature 1 in the service scope: [docs/scope/scope.md](../scope/scope.md), with its spec in [docs/specs/](../specs/) (on `example/track`: spec 0001 `Accepted`, 11 of 11 ACs pass in the verify report, review findings 3 and 4 fixed)
 
 ## Slice 2: Cache
 
 ### 6. Cache-aside toggle
 Reads check the cache first, fall back to the DB on a miss, and populate the cache. Writes delete the key after the DB commit. A config flag turns the whole thing on or off. It lives in a decorator, so use cases never know the cache exists.
-**Done when:** every AC in [docs/conventions/cache.md](../conventions/cache.md) passes, including the cache-down case, and the video shows one `oha` comparison of cache on and cache off.
+**Done when:** every AC in [docs/conventions/cache.md](../conventions/cache.md) passes, including the cache-down case, shown in the demo through `X-Cache`.
 - [x] Spec it: [docs/conventions/cache.md](../conventions/cache.md)
 - [ ] Build it (conventions + chat)
-   - [ ] Infrastructure + adapters (AC-1 to AC-6): cache helper, decorator, debug header, metrics. Built: `cache_aside` (`RedisCache`, `get_or_load`, `invalidate`), the `cache_status` task-local, the `X-Cache` middleware, and the production guard. Open: the per-resource decorator, which comes with `/flow-build music`. Metrics and AC-6 are deferred
-   - [ ] Wiring + integration tests (AC-1 to AC-4, AC-7): toggle, container tests, demo measurement. Built: shared `RedisCache` and `X-Cache` wiring, and container tests of the helper and the header (`crates/bootstrap/tests/cache.rs`). Open: AC-1 to AC-4 end to end need a resource behind the decorator, and the demo measurement. AC-7 is deferred
+   - [ ] Infrastructure + adapters (AC-1 to AC-6): cache helper, decorator, debug header, metrics. Built: `cache_aside` (`RedisCache`, `get_or_load`, `invalidate`), the `cache_status` task-local, the `X-Cache` middleware, and the production guard. The per-resource decorator came with `/flow-build tracks` (`CachedTrackRepository` on `example/track`). Metrics and AC-6 are deferred
+   - [ ] Wiring + integration tests (AC-1 to AC-4, AC-7): toggle, container tests. Built: shared `RedisCache` and `X-Cache` wiring, and container tests of the helper and the header (`crates/bootstrap/tests/cache.rs`). AC-1 to AC-4 pass end to end with tracks on `example/track` (`track_cache.rs`, and the verify report including Redis stopped). The demo measurement is dropped (decision of 2026-10-12). AC-7 is deferred
 - [ ] Verify it (check the convention's ACs on the running stack)
-- [x] Perf it: (deferred at the MVP cut; the video shows one `oha` cache on/off comparison)
+- [x] Perf it: (deferred at the MVP cut; no load measurement in the demo, decision of 2026-10-12)
 - [ ] Review it (fresh session, using `.agents/skills/flow-review/checklist.md`)
 - [ ] Sync it (update this file and the decisions log)
 [docs/conventions/cache.md](../conventions/cache.md)
@@ -118,31 +114,13 @@ Accepts commands from topics and calls the same use cases as HTTP. Publishes eve
 - [x] Spec it: [docs/conventions/kafka.md](../conventions/kafka.md)
 - [ ] Build it (conventions + chat)
    - [ ] Application (AC-1): event publisher port
-   - [ ] Infrastructure + adapters (AC-1 to AC-6): envelope, consumer, DLQ, idempotent repository writes. The generic parts are built in `crates/kafka-api` (strict envelope, `CommandHandler`, dispatcher, single-loop consumer, DLQ with `error.reason`; AC-3 and AC-5). Idempotent repository writes (AC-2) and the music handlers need the music resource
-   - [ ] Wiring + integration tests (AC-1 to AC-7): container tests, broker UI, demo producer. Built: `wiring::kafka_handlers`, container tests with a dummy handler (AC-1 receive, AC-3, AC-5), `cargo xtask kafka-produce`, and kafka-ui in compose (AC-7, not yet checked in the UI). AC-1 and AC-2 end to end (a DB row, no duplicate on re-send) need the music resource
+   - [ ] Infrastructure + adapters (AC-1 to AC-6): envelope, consumer, DLQ, idempotent repository writes. The generic parts are built in `crates/kafka-api` (strict envelope, `CommandHandler`, dispatcher, single-loop consumer, DLQ with `error.reason`; AC-3 and AC-5). No resource handler: Kafka is not part of the demo (decision of 2026-10-12), and tracks declares no commands. Idempotent repository writes (`ON CONFLICT (id) DO NOTHING`, `AlreadyExists`) are built in the tracks repository, but no Kafka command exercises them
+   - [ ] Wiring + integration tests (AC-1 to AC-7): container tests, broker UI, demo producer. Built: `wiring::kafka_handlers`, container tests with a dummy handler (AC-1 receive, AC-3, AC-5), `cargo xtask kafka-produce`, and kafka-ui in compose (AC-7, not yet checked in the UI). AC-1 and AC-2 end to end (a DB row, no duplicate on re-send) stay unproven until a resource declares commands
 - [ ] Verify it (check the convention's ACs on the running stack)
-- [x] Perf it: (deferred at the MVP cut; the video shows one `oha` cache on/off comparison)
+- [x] Perf it: (deferred at the MVP cut; no load measurement in the demo, decision of 2026-10-12)
 - [ ] Review it (fresh session, using `.agents/skills/flow-review/checklist.md`)
 - [ ] Sync it (update this file and the decisions log)
 [docs/conventions/kafka.md](../conventions/kafka.md)
-
-## Slice 4: Dogfood
-
-### 8. Dogfood: AI builds a second resource (standard)
-_Dropped on 2026-10-10 (engineer decision): the video shows `/flow-spec music` and `/flow-build music` from the bare boilerplate, so feature 5 covers it. The text below is kept for history._
-
-Use the flow skills to have Claude Code and Codex build a new resource with a different shape (for example, one with a relation). This proves the workflow generalizes.
-**Done when:** the new resource has the same structure as `products` (checked by eye in the video), and the verification gate passes.
-- [ ] Added live in the video with `/flow-spec categories`, tracked in [docs/scope/scope.md](../scope/scope.md) and [docs/specs/](../specs/). (Dropped: `categories` no longer exists in the plan, see feature 5 and [docs/prompts/demo-music.md](../prompts/demo-music.md).)
-
-## Delivery
-
-### 9. Demo video & submission
-A 6 to 8 minute video, a README, and an email to the team. This is a non-code feature, so it uses plain task boxes.
-**Done when:** the email with the repo and video links has been sent on time.
-- [ ] Write the video script from the ACs of features 5 to 8
-- [ ] Record and edit
-- [ ] Send the email
 
 ## Timeline (deadline: Wed 14 Oct 2026)
 
@@ -150,28 +128,27 @@ A 6 to 8 minute video, a README, and an email to the team. This is a non-code fe
 |-----|------|
 | Fri 9 | Finish grilling. Conventions and the skills spec become Accepted |
 | Sat 10 | Scaffold (feature 2), then the building blocks of features 3 and 4 |
-| Sun 11 | The building blocks of features 6 and 7, then `/flow-spec music` (the grill) and `/flow-build music` (feature 5) |
-| Mon 12 | Skill tooling (feature 1), then `/flow-verify music` and `/flow-review music` |
-| Tue 13 | Codex check (open question W1), then record the video (feature 9) |
+| Sun 11 | The building blocks of features 6 and 7 |
+| Mon 12 | `/flow-spec tracks` (the grill), `/flow-build tracks`, `/flow-verify tracks`, and `/flow-review tracks` (feature 5) on `example/track` |
+| Tue 13 | Codex check (open question W1) |
 | Wed 14 | Buffer, review, submit |
 
 Timeline before the music decision (kept for history):
 | (old) Sun 11 | The building blocks of features 6 and 7, then `/flow-build products` (feature 5) |
-| (old) Mon 12 | Skill tooling (feature 1) and dogfooding `categories` (feature 8) |
-| (old) Tue 13 | Record the video (feature 9) |
+| (old) Mon 12 | Skill tooling (feature 1) |
 | (old) Wed 14 | Buffer, review, submit |
 
 Timeline before the build-order decision (kept for history):
 | (old) Sat 10 | Scaffold (feature 2) and CRUD for products (features 3, 5) |
 | Sun 11 | Cache (feature 6) and the four skills (feature 1) |
-| Mon 12 | Kafka (feature 7) and dogfooding `categories` (feature 8) |
+| Mon 12 | Kafka (feature 7) |
 
 Timeline before the MVP cut (kept for history):
 | (old) Fri 9 | Finish grilling. Conventions and the skills spec become Accepted |
 | Sat 10 | Features 1 (skill tooling), 2, 3 |
 | Sun 11 | Features 4, 5 |
 | Mon 12 | Features 6, 7 |
-| Tue 13 | Feature 8, perf report, record the video |
+| Tue 13 | Perf report |
 | Wed 14 | Buffer, review, submit |
 
 ## Deferred
@@ -181,7 +158,7 @@ Out of scope for this pass, kept here so the plan stays honest.
 - **Negative caching** and **delayed double delete**
 - **Schema registry (Avro/Protobuf)** for Kafka
 - **Mock OIDC provider in compose** for a full token-endpoint flow
-- **A second resource that mirrors the first (dogfood)**: was feature 8, dropped on 2026-10-10
+- **A second resource that mirrors the first (dogfood)**: dropped on 2026-10-10
 - **gRPC transport**, **cloud deploy**, **full RBAC**, **multi-tenancy**, **frontend**
 
 ## Decisions log (project level)
@@ -205,7 +182,8 @@ Out of scope for this pass, kept here so the plan stays honest.
 | 2026-10-10 | Feature 7 build decisions ([docs/conventions/kafka.md](../conventions/kafka.md)), MVP only: DLQ headers `error.reason` (one of eight codes) and `error.detail` (field errors for `validation`, a fixed sentence otherwise, never an internal cause); the offset is committed after success or after the DLQ write, a failed DLQ write stops the consumer and the process, and compose restarts `app` with `unless-stopped`; `auto.offset.reset=earliest` (the librdkafka default is `largest`, the same as `latest`); one receive loop, so cross-partition parallelism moves to Deferred; a strict envelope with six required fields and a key equal to `payload.id`; payloads are the HTTP bodies plus `id`, parsed by the shared `Field<T>`, `UnknownFields`, and application parser; `cargo xtask kafka-produce` sends a generated envelope or a raw value. With no handler registered, `consume` exits non-zero and `all` runs HTTP only ([runtime.md](../conventions/runtime.md)) |
 | 2026-10-10 | Redis and Kafka opt-in (engineer decision): `ENABLE_FEATURES` (empty by default, accepts `cache` and `kafka`) replaces `DISABLE_FEATURES`, so a fresh clone starts only what it uses. The compose services sit in profiles with the same names (`redis` in `cache`; `kafka`, `kafka-init`, and `kafka-ui` in `kafka`), `make up` sets `COMPOSE_PROFILES` from the switch, and `make down` stops every profile ([runtime.md](../conventions/runtime.md), Compose topology; [Compose profiles](https://docs.docker.com/compose/how-tos/profiles/)). Removing the code with Cargo features stays deferred ([cache.md](../conventions/cache.md), [kafka.md](../conventions/kafka.md)) |
 | 2026-10-10 | Independent review of the `products` example fixed two gaps in the boilerplate snippets (they were copied faithfully into the resource): `application::input::uuid_v7` now parses every producer-supplied id, since a non-v7 id sorts above every v7 id and breaks the newest-first list; and `wiring::Infra` builds the Postgres pool and the Redis connection once per process for `/readyz`, HTTP, and Kafka, instead of one pool per resource builder. `layers.md` sections 3 and 6 carry the new snippets (engineer-approved plan) |
-| 2026-10-10 | Example resource is `music` (engineer decisions): (1) the example changes from `products` to a simple `music` CRUD. The engineer designs its fields later in their own session with `/flow-spec music`, and it uses the cache and the Kafka commands (create, update, delete) so it can demo both. (2) `categories` is dropped completely, so there is no second dogfood resource. Feature 8 is dropped and merged into the music example: the video shows `/flow-spec music` and then `/flow-build music` from the bare boilerplate, and a second resource that mirrors the first moves to Deferred. (3) The branch is `example/music`, created from `main`. `example/products` stays local only (never pushed) and is deleted after music passes review |
+| 2026-10-10 | Example resource is `music` (engineer decisions): (1) the example changes from `products` to a simple `music` CRUD. The engineer designs its fields later in their own session with `/flow-spec music`, and it uses the cache and the Kafka commands (create, update, delete) so it can demo both. (2) `categories` is dropped completely, so there is no second dogfood resource. The demo runs `/flow-spec music` and then `/flow-build music` from the bare boilerplate, and a second resource that mirrors the first moves to Deferred. (3) The branch is `example/music`, created from `main`. `example/products` stays local only (never pushed) and is deleted after music passes review (superseded on 2026-10-12, see the tracks row below) |
+| 2026-10-12 | Example resource is `tracks`, and neither Kafka nor an `oha` comparison is part of the demo (engineer decisions): (1) the example built through the flow is `tracks` (title, artist, duration; full CRUD; cache on), spec 0001 on the `example/track` branch, one commit per flow step. It replaces `music`. (2) tracks declares no Kafka commands, and no more work is added for the demo, so kafka.md AC-1 and AC-2 stay proven only up to the dummy-handler tests (receive, DLQ, ordering); the Kafka code stays in the boilerplate, off by default. (3) The demo `.env` needs `ENABLE_FEATURES=cache` only. (4) There is no `oha` cache on/off comparison: the demo shows the cache through `X-Cache` (MISS, HIT, invalidation, and `ERROR` with Redis stopped) |
 | 2026-10-09 | Perf method ([docs/conventions/api.md](../conventions/api.md) A2, A4, A5): the SLI is the percentage of requests under a threshold, in two grades. The ceiling is 99% < 100 ms. Targets come from a rounded baseline. The load is an open model with keep-alive on. The operating rate is the measured knee. Every number comes from a reference or a measurement |
 
 ## Open questions
@@ -218,7 +196,7 @@ Out of scope for this pass, kept here so the plan stays honest.
 
 | # | Question | Decision |
 |---|----------|----------|
-| P3 | Submit as a public GitHub repo, or a private repo with invites? | Public repo plus an unlisted video |
+| P3 | Submit as a public GitHub repo, or a private repo with invites? | Public repo |
 
 ## Legend
 

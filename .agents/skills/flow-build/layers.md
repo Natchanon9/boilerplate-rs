@@ -31,7 +31,7 @@ On a bare boilerplate no crate depends on `domain` yet. The first resource adds 
 - `commands.rs`: raw input structs (`Create<Res>Input`, `Update<Res>Input`), and the parser that turns them into commands made of domain value objects. The parser collects every field error into `AppError::Validation` ([api.md](../../../docs/conventions/api.md), input error rules). Both inbound adapters call it.
 - `use_cases.rs`: `<Res>UseCases { repo: Arc<dyn <Res>Repository> }`, with one method per enabled operation. Generate the UUIDv7 for HTTP creates. Map domain errors to `AppError`.
 - `fakes.rs` (`#[cfg(test)]` or a `testing` feature): in-memory implementations of the ports.
-- `contract.rs` (feature `testing`): `pub async fn <res>_repository_contract(repo: &dyn <Res>Repository)`. It is written once against the port, covering insert (and `AlreadyExists`), unique conflicts, get, keyset paging, update, and delete. The fake must pass it in a unit test ([database.md](../../../docs/conventions/database.md) AC-4).
+- `contract.rs` (feature `testing`; `crates/application/Cargo.toml` has no `testing` feature on a bare boilerplate, so the first resource build adds `[features] testing = []` there and enables it as a dev-dependency feature in `infrastructure` and `bootstrap`): `pub async fn <res>_repository_contract(repo: &dyn <Res>Repository)`. It is written once against the port, covering insert (and `AlreadyExists`), unique conflicts, get, keyset paging, update, and delete. The fake must pass it in a unit test ([database.md](../../../docs/conventions/database.md) AC-4).
 - Errors: `AppError { NotFound, Conflict, Validation(Vec<FieldError>), Unavailable, Unauthorized, Forbidden, Internal }`.
 - No sqlx, redis, axum, or rdkafka. `tokio` is allowed only for the shared `cache_status` task-local; resource modules never use it.
 
@@ -138,7 +138,7 @@ impl<R: WidgetRepository> WidgetRepository for CachedWidgetRepository<R> {
 **HTTP (`crates/http-api/src/<res>/`)**
 - `dto.rs`: `Create<Res>Request` and `Update<Res>Request`, where every field is `application::input::Field<T>` and `#[serde(flatten)] unknown: UnknownFields` captures the rest ([api.md](../../../docs/conventions/api.md), input error rules). They do no validation; they convert into the application's raw input structs. `<Res>Response` lists every field explicitly, emits optional fields as `null`, and writes timestamps in RFC 3339 UTC. Never serialize an entity or row directly.
 - `handlers.rs`: each handler is thin (extract, map to a command, call the use case, map to a response). No business logic and no SQL.
-- `routes.rs`: `/api/v1/<res_plural>` on the **protected** router, with `RequireScope("<res>:read" | "<res>:write")` on every route ([runtime.md](../../../docs/conventions/runtime.md)).
+- `routes.rs`: `/api/v1/<res_plural>` on the **protected** router, with `RequireScope("<res_plural>:read" | "<res_plural>:write")` on every route ([runtime.md](../../../docs/conventions/runtime.md)).
 
 **Request DTO** (`dto.rs`). It converts to the application's raw input and does no checks. `WidgetResponse` (not shown) lists every field and has a `From<Widget>`.
 ```rust
@@ -227,19 +227,19 @@ pub fn routes(uc: Arc<WidgetUseCases>) -> Router {
         .route(
             "/widgets",
             get(list)
-                .route_layer(RequireScope("widget:read"))
-                .merge(post(create).route_layer(RequireScope("widget:write"))),
+                .route_layer(RequireScope("widgets:read"))
+                .merge(post(create).route_layer(RequireScope("widgets:write"))),
         )
         .route(
             "/widgets/{id}",
-            get(fetch).route_layer(RequireScope("widget:read")),
+            get(fetch).route_layer(RequireScope("widgets:read")),
         )
         .with_state(uc)
 }
 ```
 
 **Kafka (`crates/kafka-api/src/<res>/`)** (only when the spec declares commands)
-- `handlers.rs`: a `kafka_api::CommandHandler` for the resource. It declares its topic (`<res_plural>.commands.v1`) and its types (`<res>.create`, `<res>.update`, `<res>.delete`), and `handle(type, payload)` calls the use cases. It never touches the envelope, offsets, or the DLQ: the generic consumer parses the envelope, writes the DLQ message from the returned `AppError`, and commits ([kafka.md](../../../docs/conventions/kafka.md)).
+- `handlers.rs`: a `kafka_api::CommandHandler` for the resource. It declares its topic (`<res_plural>.commands.v1`, which is authoritative: it must match the `kafka-init` names, and `cargo xtask kafka-produce` needs `--topic <name>` when the plural is irregular) and its types (`<res>.create`, `<res>.update`, `<res>.delete`), and `handle(type, payload)` calls the use cases. It never touches the envelope, offsets, or the DLQ: the generic consumer parses the envelope, writes the DLQ message from the returned `AppError`, and commits ([kafka.md](../../../docs/conventions/kafka.md)).
 - Payloads: create = the POST body plus `id`, update = the PUT body plus `id`, delete = `{id}`. Declare each as a `#[serde(default)]` struct of `application::input::Field<T>` fields with `#[serde(flatten)] unknown: UnknownFields` (the same shape as the HTTP request DTO plus `id`; `kafka-api` cannot import `http-api`), decode it with `kafka_api::payload::decode`, and pass it to the same application parser as HTTP. Never write a second validation path.
 
 **Handler shape** (`handlers.rs`). It decodes, builds the same raw input as HTTP, and calls the same parser, so it holds no validation. `?` returns the parser's `AppError` to the consumer, which writes the DLQ message. Create is idempotent because the use case treats `AlreadyExists` as success.

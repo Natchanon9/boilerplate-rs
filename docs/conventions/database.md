@@ -1,7 +1,7 @@
 # Database platform, migrations, and seeds
 
 **Date**: 2026-10-10
-**Status**: Proposed
+**Status**: Accepted
 **Kind**: capability
 **Built in**: [assignment feature 2](../assignment/scope.md)
 
@@ -34,7 +34,7 @@ So portability lives in the port, not in shared SQL. Each adapter writes SQL nat
 | Pool errors | A repository maps a pool or connection error with `postgres::unavailable(&pool, &err)`, never by hand. On `PoolTimedOut` the cause ends in `(open <size>/<max>, idle <n>)`: `open 10/10, idle 0` is a full pool, `open 0/10` is an unreachable database. Only numbers are added, never the URL ([security.md](security.md) SEC-9). `/readyz` logs the same cause |
 | SQL | Native to the engine, with compile-time-checked `sqlx::query!` macros ([security.md](security.md) SEC-8). Portability comes from the port and the contract tests, not from shared SQL |
 | Migrations | `migrations/postgres/`, created with `sqlx migrate add -r --source migrations/postgres <name>` |
-| Seeds | `seeds/postgres/0001_products.sql`: 25 products with fixed UUIDv7 ids (own proposal: more than two pages at the default `limit` of 10, so the demo shows `next_cursor`) |
+| Seeds | `seeds/postgres/0001_widgets.sql` (for example): 25 widgets with fixed UUIDv7 ids (own proposal: more than two pages at the default `limit` of 10, so the demo shows `next_cursor`) |
 | Contract tests | `crates/application/src/<res>/contract.rs`, behind a `testing` feature: `pub async fn <res>_repository_contract(repo: &dyn <Res>Repository)`. It covers insert (including `AlreadyExists` for a repeated id), unique conflicts, get, keyset paging, update, and delete. The fake runs it in a unit test. The Postgres adapter runs it in an integration test with testcontainers |
 
 ### Recipe: add a database platform
@@ -67,7 +67,7 @@ So portability lives in the port, not in shared SQL. Each adapter writes SQL nat
 ## Deferred
 
 ### More adapters (SQLite, MySQL), as the recommended path for the future
-**Deferred:** one adapter is enough to show the seam within the 14 Oct deadline. A second adapter means a second repository for every resource, which also doubles what the AI must generate in the live demo. **MVP uses:** Postgres only, plus the recipe and the contract tests above, so a second adapter can be added without touching use cases.
+**Deferred:** one adapter is enough to show the seam in the MVP. A second adapter means a second repository for every resource, which also doubles what the AI must generate in the live demo. **MVP uses:** Postgres only, plus the recipe and the contract tests above, so a second adapter can be added without touching use cases.
 
 Notes for when this returns:
 - **SQLite** has no UUID or timestamp column types. Store them as `TEXT` (RFC 3339) and convert them in the adapter. `RETURNING` is available from 3.35 ([SQLite](https://www2.sqlite.org/lang_returning.html)).

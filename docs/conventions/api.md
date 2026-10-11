@@ -1,7 +1,7 @@
 # API conventions for every resource
 
 **Date**: 2026-10-09 (cut to MVP on 2026-10-10)
-**Status**: Proposed
+**Status**: Accepted
 **Kind**: capability
 **Built in**: [assignment feature 3](../assignment/scope.md)
 
@@ -9,7 +9,7 @@
 
 These are the shared rules every CRUD resource follows: URL shape, pagination, error format, and input validation. Because they are decided once here, a resource spec only has to cover what is specific to that resource. That is what lets the workflow handle any kind of resource.
 
-This file describes the **MVP**. Everything that was designed but cut for the 14 Oct deadline is kept under [Deferred](#deferred), each with its reason.
+This file describes the **MVP**. Everything that was designed but cut to keep the MVP small is kept under [Deferred](#deferred), each with its reason.
 
 ## Requirements
 
@@ -86,7 +86,7 @@ AC-9 and AC-10 are deferred.
 | Request body | 2 MiB | [axum `DefaultBodyLimit` default](https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html) |
 | Page size | default 10, maximum 100 | [Stripe pagination](https://docs.stripe.com/api/pagination) |
 | JWT clock leeway | 60 s | [`jsonwebtoken` `Validation` default](https://docs.rs/jsonwebtoken/latest/jsonwebtoken/struct.Validation.html), within [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519)'s "no more than a few minutes" |
-| Cache TTL | 300 s | own proposal: every write already deletes the key, so the TTL only bounds staleness when a delete is missed, and product data changes rarely ([AWS: pick TTL from the rate of change](https://docs.aws.amazon.com/whitepapers/latest/database-caching-strategies-using-redis/cache-validity.html)) |
+| Cache TTL | 300 s | own proposal: every write already deletes the key, so the TTL only bounds staleness when a delete is missed, and most resource data changes rarely ([AWS: pick TTL from the rate of change](https://docs.aws.amazon.com/whitepapers/latest/database-caching-strategies-using-redis/cache-validity.html)) |
 | Kafka message size | broker default `message.max.bytes` | [Kafka broker configs](https://kafka.apache.org/documentation/#brokerconfigs_message.max.bytes) |
 | Request timeout | none set in the MVP | deferred (N4) |
 | Database connection acquire | `acquire_timeout` 1 s, `acquire_slow_threshold` 500 ms, `max_connections` 10; bounds getting a connection, not a query | [database.md](database.md) Pool row and P1, decided 2026-10-11 with measured latencies |
@@ -111,7 +111,7 @@ AC-9 and AC-10 are deferred.
 
 ## Deferred
 
-Designed and decided, then cut on 2026-10-10 so the MVP ships by 14 Oct. Each item keeps its original text, so the reasoning is available in review and in the interview.
+Designed and decided, then cut on 2026-10-10 to keep the MVP small. Each item keeps its original text, so the reasoning is available in review and in the interview.
 
 ### ETag and If-Match (optimistic locking)
 **Deferred:** the brief does not ask for concurrency control, and last-write-wins is enough for the demo. **MVP uses:** `PUT` without preconditions; the `version` column is kept, so this can return without a migration.
@@ -170,14 +170,14 @@ Original text:
 | P4 | Per-client rate limit (requests per second per token `sub`) | Ask the team. It is a business number ([OWASP API4](https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/)). Until answered, the value is config. Moved here from the assignment scope |
 
 ### Performance budgets (method decided 2026-10-09, A2, A4, A5; numbers pending the baseline run)
-**Deferred:** an SLO method (two grades, capacity search, Kneedle knee, baseline gate) is production practice that a four-day demo does not need. **MVP uses:** one `oha` comparison of a hot-key GET with the cache on and off at the same rate, shown in the video ([cache.md](cache.md), demo measurement).
+**Deferred:** an SLO method (two grades, capacity search, Kneedle knee, baseline gate) is production practice that the MVP does not need. **MVP uses:** no load measurement; the demo shows the cache through `X-Cache` (the oha cache on/off comparison is deferred too, [cache.md](cache.md) Deferred).
 
 Every number below either comes from a cited reference or is produced by measurement. Nothing is picked arbitrarily. Rules marked **(own proposal)** are reasoning, not taken from a reference.
 
 1. **SLI**: the percentage of requests faster than a threshold, measured at the client (the load generator). Reports still show p50, p95, and p99 for readability. ([Google CRE](https://cloud.google.com/blog/products/gcp/building-good-slos-cre-life-lessons/))
 2. **Two grades for each operation**: `90% < T90` and `99% < T99`. ([SRE workbook](https://sre.google/workbook/implementing-slos/), [Google CRE](https://cloud.google.com/blog/products/gcp/building-good-slos-cre-life-lessons/))
 3. **Ceiling**: for every operation, `T99 <= 100 ms`, measured at the service. 100 ms is the "feels instantaneous" limit, and the service is only one hop of a user's request, so it must fit inside that limit. ([Nielsen](https://www.nngroup.com/videos/3-response-time-limits-interaction-design/), [RAIL](https://developer.mozilla.org/en-US/docs/Glossary/RAIL), [Tail at Scale](https://research.google/pubs/pub40801/))
-4. **Targets come from a baseline**: the first `/flow-verify products perf` run (the walking-skeleton resource in [docs/scope/scope.md](../scope/scope.md)) measures the operations, rounds the results to manageable numbers, and records them in `docs/reports/perf-baseline.md`. They then become the Accepted budgets, and later runs are gated against them. ([SRE workbook](https://sre.google/workbook/implementing-slos/): "current performance can be a good place to start")
+4. **Targets come from a baseline**: the first `/flow-verify widgets perf` run (the first resource in [docs/scope/scope.md](../scope/scope.md)) measures the operations, rounds the results to manageable numbers, and records them in `docs/reports/perf-baseline.md`. They then become the Accepted budgets, and later runs are gated against them. ([SRE workbook](https://sre.google/workbook/implementing-slos/): "current performance can be a good place to start")
 5. **Cache gate (own proposal)**: with the cache on, the hot-key GET `T99` must be lower than the cache-off GET `T99` at the same rate. Otherwise the cache adds cost without benefit.
 6. **Error rate**: 0 non-intentional errors in every run. A fast run with errors fails.
 7. **Load model**: an open model at a fixed arrival rate, `oha -q <rate> --latency-correction`, with keep-alive on (decided A5: API clients are services with pooled connections). ([Gil Tene](https://www.scylladb.com/2021/04/22/on-coordinated-omission/), [k6 docs](https://grafana.com/docs/k6/latest/using-k6/scenarios/concepts/open-vs-closed/), [oha README](https://github.com/hatoo/oha))
@@ -205,6 +205,8 @@ Every number below either comes from a cited reference or is produced by measure
 
 ### Operational limits (2026-10-10: all decided except the rate-limit value, which waits on the team)
 **Deferred:** each limit needs a measured baseline or a business number that the MVP does not have. **MVP uses:** the library defaults and cited values in "MVP limits" above.
+
+Three of these are in force today: N1 (cache TTL 300 s), N6 (JWT leeway 60 s), and N7 (page size 10 and 100). Their values are in the "MVP limits" table above; the rows below keep the research behind them.
 
 Every limit must come from a reference or from measurement, like the performance budgets.
 

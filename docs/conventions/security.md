@@ -1,7 +1,7 @@
 # Security baseline
 
 **Date**: 2026-10-09 (cut to MVP on 2026-10-10)
-**Status**: Proposed
+**Status**: Accepted
 **Kind**: capability
 **Built in**: [assignment feature 4](../assignment/scope.md)
 
@@ -15,14 +15,20 @@ The service is an **OAuth 2.0 resource server**: it validates JWT access tokens 
 
 - **Algorithm:** HS256 only, pinned in the validator. Any other `alg`, including `none`, is rejected, which blocks algorithm-confusion attacks ([RFC 8725 3.1](https://www.rfc-editor.org/rfc/rfc8725#section-3.1)).
 - **Secret:** `AUTH_JWT_SECRET` from the environment, wrapped in `secrecy::SecretString`. It must be at least 32 bytes ([RFC 7518 3.2](https://www.rfc-editor.org/rfc/rfc7518#section-3.2): an HS256 key must be at least as large as the hash output, 256 bits). The app refuses to start with a shorter secret. `.env` is gitignored, and `.env.example` holds only a placeholder.
-- **Claims:** require `sub` and `exp`, with `iss` = `AUTH_ISSUER` and `aud` containing `AUTH_AUDIENCE`. Clock leeway is the library default of 60 s ([api.md](api.md), MVP limits).
-- **Scopes:** read from `scope`, a space-delimited string ([RFC 9068](https://www.rfc-editor.org/rfc/rfc9068)). On success, a `Principal { sub, scopes }` is placed in the request extensions, and `RequireScope("products:write")` enforces authorization per route.
+- **Claims** checked (decided 2026-10-11):
+  - `sub` and `exp` are required. `exp` is enforced.
+  - `iss` must equal `AUTH_ISSUER`, and `aud` must contain `AUTH_AUDIENCE`. Both are required.
+  - `nbf` is enforced when the token has one: a token not yet valid is `401` `invalid_token`. It is not required ([RFC 7519 4.1.5](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.5): the token "MUST NOT be accepted for processing" before `nbf`).
+  - `iat` is not checked and not required.
+  - Clock leeway is the library default of 60 s, applied to `exp` and `nbf` ([api.md](api.md), MVP limits).
+  - The scope claim is `scope` only; `scp` is not read (see Deferred). The 32-byte secret rule is checked when the config is resolved, not by the JWT verifier.
+- **Scopes:** read from `scope`, a space-delimited string ([RFC 9068](https://www.rfc-editor.org/rfc/rfc9068)). On success, a `Principal { sub, scopes }` is placed in the request extensions, and `RequireScope("widgets:write")` enforces authorization per route. The standard scope names are `<res_plural>:read` and `<res_plural>:write`, with the plural from the resource's HTTP path (`widgets:read` for `/api/v1/widgets`).
 - **Responses** (decided 2026-10-10), per [RFC 6750 3.1](https://www.rfc-editor.org/rfc/rfc6750#section-3.1). Every body is problem+json ([api.md](api.md), error responses):
   - No `Authorization` header, or a scheme other than `Bearer`: `401` with `WWW-Authenticate: Bearer` and no error code. Only these two cases get the bare challenge. RFC 6750 3.1: when "the request lacks any authentication information (e.g., the client [...] attempted using an unsupported authentication method), the resource server SHOULD NOT include an error code or other error information".
-  - `Bearer` with an empty or whitespace-only token, a malformed token, a bad signature, an expired token, any `alg` other than HS256 (including `none`), a wrong `iss` or `aud`, or a missing `sub` or `exp`: `401` with `WWW-Authenticate: Bearer error="invalid_token"`.
+  - `Bearer` with an empty or whitespace-only token, a malformed token, a bad signature, an expired token, any `alg` other than HS256 (including `none`), a wrong `iss` or `aud`, a missing `sub` or `exp`, or an `nbf` still in the future beyond the leeway: `401` with `WWW-Authenticate: Bearer error="invalid_token"`.
   - A valid token without the route's scope: `403` with `WWW-Authenticate: Bearer error="insufficient_scope", scope="<required scope>"`.
 - **Unknown paths:** auth runs only on routes the protected router matches (axum `route_layer`), so an unknown path returns the problem+json `404` even without a token (decided 2026-10-10).
-- **Dev tokens:** `cargo xtask token --sub alice --scope "products:read products:write" --ttl 1h` signs with the same `AUTH_JWT_SECRET` and prints a token (decided 2026-10-10):
+- **Dev tokens:** `cargo xtask token --sub alice --scope "widgets:read widgets:write" --ttl 1h` signs with the same `AUTH_JWT_SECRET` and prints a token (decided 2026-10-10):
   - `--sub` and `--scope` (space-delimited) are required. `--ttl` defaults to `1h` (own proposal: one demo session, as in the example above) and accepts `<n>s`, `<n>m`, or `<n>h`.
   - It reads `AUTH_JWT_SECRET`, `AUTH_ISSUER`, and `AUTH_AUDIENCE` from the environment or `.env` (the environment wins, as for the app), and refuses a secret shorter than 32 bytes, like the app.
   - It signs HS256 with the claims `sub`, `scope`, `iss`, `aud`, `iat`, and `exp`, and prints only the token to stdout. Errors name the flag or env var and never print the secret (SEC-9).
@@ -32,8 +38,8 @@ The service is an **OAuth 2.0 resource server**: it validates JWT access tokens 
 
 | ID | OWASP | Control | Enforced by |
 |----|-------|---------|-------------|
-| SEC-1 | API2 Broken Authentication | JWT validation as above, on every route of the protected router. The hidden router (`/healthz`, `/readyz`) has no auth and is not reachable from outside the deployment ([runtime.md](runtime.md)) | Middleware + tests |
-| SEC-2 | API5 BFLA | Every route declares its required scope (`<res>:read`, `<res>:write`) | `RequireScope` + 403 tests |
+| SEC-1 | API2 Broken Authentication | JWT validation as above, on every route of the protected router. The hidden router (`/healthz`, `/readyz`) has no auth and must not be routed outside the deployment ([runtime.md](runtime.md), Hidden router exposure) | Middleware + tests |
+| SEC-2 | API5 BFLA | Every route declares its required scope: `<res_plural>:read` or `<res_plural>:write`, the plural of its HTTP path (`widgets:read` for `/api/v1/widgets`) | `RequireScope` + 403 tests |
 | SEC-3 | API1 BOLA | An owned resource's spec defines an ownership rule, and its queries filter by owner (`sub`) | Resource spec + tests |
 | SEC-4 | API3 BOPLA / mass assignment | Request DTOs are allowlists: every unknown field is rejected as `unknown_field`, and all of them are reported ([api.md](api.md), input error rules). Response DTOs list their fields explicitly. Entities and rows are never serialized directly | Review + tests |
 | SEC-5 | API4 Resource consumption | Body limit and page size cap ([api.md](api.md), MVP limits). Rate limit and request timeout are deferred | Middleware |
@@ -62,7 +68,7 @@ SEC-12 is deferred.
 
 ## Deferred
 
-Designed and decided, then cut on 2026-10-10 so the MVP ships by 14 Oct. The original text is kept.
+Designed and decided, then cut on 2026-10-10 to keep the MVP small. The original text is kept.
 
 ### Asymmetric keys, JWKS, and dev key pairs (S1 as decided on 2026-10-09)
 **Deferred:** JWKS fetching and caching, key generation, and `kid` handling are more code than a demo needs. **MVP uses:** HS256 with a shared secret from the environment. Switching later changes the key source and the algorithm allowlist, not the extractor's interface.
@@ -82,14 +88,14 @@ Original text (Authentication design, decided 2026-10-09, S1):
 
 - **JWKS URL:** keys are cached in memory with a TTL. An unknown `kid` triggers one refresh, rate-limited to stop a key-flooding DoS.
 - **Dev keys:** `make setup` (`cargo xtask dev-keys`) generates an ES256 key pair into `.secrets/dev/`, which is gitignored. No private key is ever committed, not even a dev one.
-- **Dev tokens:** `cargo xtask token --sub alice --scope "products:read products:write" --ttl 1h` signs with the dev private key and prints a token.
+- **Dev tokens:** `cargo xtask token --sub alice --scope "widgets:read widgets:write" --ttl 1h` signs with the dev private key and prints a token.
 - **Nothing else runs.** No extra container, no extra service. Pointing at a real IdP later is a config change, not a code change.
 
 #### Validation rules
 - Require `kid`, `iss` = `AUTH_ISSUER`, `aud` contains `AUTH_AUDIENCE`, and the `exp`, `nbf`, and `iat` claims (leeway: [docs/conventions/api.md](api.md) N6).
 - Require `sub`.
 - Scopes come from `scope` (a space-delimited string, per [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068)), falling back to `scp` (an array, for IdPs that use it).
-- On success, a `Principal { sub, scopes }` is placed in the request extensions. `RequireScope("products:write")` enforces authorization per route.
+- On success, a `Principal { sub, scopes }` is placed in the request extensions. `RequireScope("widgets:write")` enforces authorization per route.
 - Responses are `401` for a missing or invalid token (with `WWW-Authenticate: Bearer error="invalid_token"`) and `403` for a missing scope (`insufficient_scope`), per [RFC 6750 3.1](https://www.rfc-editor.org/rfc/rfc6750#section-3.1).
 
 #### Libraries

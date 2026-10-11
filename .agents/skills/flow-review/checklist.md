@@ -10,10 +10,10 @@
 - **ARCH-7** Code matches the spec. Any behavior not in the spec is flagged as an undocumented decision.
 
 ## Security (from [docs/conventions/security.md](../../../docs/conventions/security.md))
-- **SEC-1** JWT validation: HS256 is pinned, the secret is at least 32 bytes, and exp, iss, and aud are checked.
-- **SEC-2** Every route declares a scope.
+- **SEC-1** JWT validation: HS256 is pinned, the secret is at least 32 bytes, `sub` and `exp` are required, `iss` and `aud` are checked, and `nbf` is checked when present.
+- **SEC-2** Every route declares a scope, named `<res_plural>:read` or `<res_plural>:write`.
 - **SEC-3** Owned resources filter by owner in every query.
-- **SEC-4** `deny_unknown_fields` on requests, and explicit response fields.
+- **SEC-4** Request DTOs reject unknown fields through `#[serde(flatten)] unknown: UnknownFields`, which reports every `unknown_field` (not `deny_unknown_fields`, [api.md](../../../docs/conventions/api.md)), and response fields are explicit.
 - **SEC-5** Limits: body size and page size.
 - **SEC-6** No internal detail in errors. Debug features are off in prod config.
 - **SEC-7** Kafka input is validated like HTTP input.
@@ -21,6 +21,7 @@
 - **SEC-9** Secrets use secret types. No secret or token is logged.
 - **SEC-10** New dependencies pass `cargo deny`, and each is justified.
 - **SEC-11** No `unsafe`, and no `unwrap`, `expect`, or `panic!` outside tests.
+- **SEC-13** Logs are structured and carry no PII or tokens: no claim values, payloads, or `Authorization` headers.
 
 ## API conventions (from [docs/conventions/api.md](../../../docs/conventions/api.md))
 - **API-1** Path and naming conventions are followed.
@@ -50,5 +51,6 @@
 - **API-5** ETag and If-Match on get and update: deferred with optimistic locking.
 - **PERF-8** An over-budget perf result: deferred with the perf method.
 - The rate-limit and timeout parts of **SEC-5**: deferred with rate limiting.
+- **SEC-12** Container hardening (distroless, non-root): deferred.
 
 See the `## Deferred` sections in `docs/conventions/` for the reasons.

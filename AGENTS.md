@@ -4,7 +4,7 @@ Project context for AI coding tools (Claude Code, Codex, and others). This is th
 
 ## What this is
 
-A Rust CRUD service boilerplate built on clean architecture: axum, sqlx with PostgreSQL, an opt-in Redis cache-aside layer, and Kafka as an opt-in second inbound transport. Resources are added through a spec-driven workflow (`/flow-spec` > `/flow-build` > `/flow-verify` > `/flow-review`) that keeps every resource shaped like `products`.
+A Rust CRUD service boilerplate built on clean architecture: axum, sqlx with PostgreSQL, an opt-in Redis cache-aside layer, and Kafka as an opt-in second inbound transport. Resources are added through a spec-driven workflow (`/flow-spec` > `/flow-build` > `/flow-verify` > `/flow-review`) that keeps every resource shaped like each other (the examples here use a neutral `widgets` resource; no resource ships).
 
 The boilerplate ships with no resource. Add your first one with `/flow-spec <resource>`, then `/flow-build <resource>`; `layers.md` is the reference until a resource exists.
 
@@ -28,11 +28,11 @@ The boilerplate ships with no resource. Add your first one with `/flow-spec <res
 | `cargo xtask kafka-produce --type <res>.<op> --payload '<json>' [--repeat N]` | Sends a command envelope to `<res>s.commands.v1` (key = `payload.id`; a create without `id` gets a UUIDv7) and prints the `message_id` and key. `--raw '<text>' --key <k> --type <t>` sends an unchecked value for the DLQ demo. Reads `KAFKA_BROKERS` from the environment or `.env` |
 | `cargo run -p bootstrap -- <command>` | The `app` binary: `serve`, `consume`, `all`, `db migrate\|rollback\|seed`, `info env\|features`. `--help` works on every command |
 | `sqlx migrate add -r --source migrations/postgres <verb>_<res_plural>` | New reversible migration (up and down) |
-| `cargo sqlx prepare --workspace -- --all-targets --all-features` | Refreshes `.sqlx/` after changing a query. Commit the result; the Docker build compiles offline from it |
+| `cargo sqlx prepare --workspace -- --all-targets --all-features` | Refreshes `.sqlx/` after changing a query. The folder does not exist until the first resource adds a `sqlx::query!` (`make sqlx-check` passes without it); then commit it, because the Docker build compiles offline from it |
 
 Building needs `cmake` and the libcurl headers (`libcurl4-openssl-dev`) for rdkafka ([stack-architecture.md](docs/conventions/stack-architecture.md), Consequences).
 
-Local ports: protected API `8080`, public `8081`, hidden `127.0.0.1:8079` (`/healthz`, `/readyz`), kafka-ui `127.0.0.1:8090`, postgres `5432`, redis `6379`, kafka `9092`. The values and their sources are in [runtime.md](docs/conventions/runtime.md) and [docker-compose.yml](docker-compose.yml).
+Local ports: protected API `8080`, public `8081`, hidden `8079` (`/healthz`, `/readyz`; the app binds `HOST`, default `0.0.0.0`, and compose publishes this port on `127.0.0.1` only), kafka-ui `127.0.0.1:8090`, postgres `5432`, redis `6379`, kafka `9092`. The values and their sources are in [runtime.md](docs/conventions/runtime.md) and [docker-compose.yml](docker-compose.yml).
 
 ## Layout
 
@@ -50,10 +50,10 @@ seeds/<platform>/       idempotent demo data, run in file-name order
 
 The full crate map is in [stack-architecture.md](docs/conventions/stack-architecture.md). Each resource is a module in every layer (`crates/*/src/<res>/`), built in the order in `layers.md`.
 
-## Hard rules (the build or `make verify` fails)
+## Hard rules (`make verify` fails)
 
 - **Dependency rule.** Inner crates never name outer crates or frameworks. `deny.toml` bans enforce it. Never work around a ban with a feature flag, a re-export, or a new wrapper entry.
-- **No panics outside tests** (SEC-11): `unwrap`, `expect`, and `panic!` are denied by `[workspace.lints]`; `unsafe` is forbidden. Integration-test files start with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`, because `clippy.toml` only covers `#[test]` functions.
+- **No panics outside tests** (SEC-11): `unwrap`, `expect`, and `panic!` are clippy lints denied by `[workspace.lints]`, so they fail `make clippy` and `make verify`, not a plain `cargo build`; `unsafe` is forbidden. Integration-test files start with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`, because `clippy.toml` only covers `#[test]` functions.
 - **SQL** (SEC-8): only `sqlx::query!` / `query_as!`, or a `&'static str` with bound parameters. `AssertSqlSafe`, `QueryBuilder`, and SQL in `format!` fail `make sql-check`. The seed runner in `crates/infrastructure/src/postgres/mod.rs` is the only exception.
 - **Doc references:** a code comment cites rules as `(<file>.md <ID>)`, for example `(security.md SEC-9)`. `make ref-check` fails when the file or the ID no longer exists ([stack-architecture.md](docs/conventions/stack-architecture.md), Code comments).
 - **Errors:** `thiserror` in every library crate. `anyhow` only in `bootstrap` (a `deny.toml` ban).
@@ -63,12 +63,13 @@ The full crate map is in [stack-architecture.md](docs/conventions/stack-architec
 ## Conventions you will need
 
 - **Config:** each setting is a clap arg with `env = "NAME"` in `crates/bootstrap/src/config.rs`; precedence is flag > env > `.env`. Each command resolves only the settings it needs, and errors name the env var. Add new settings to `.env.example` and to `Settings::redacted_env`.
+- **Logging:** the filter comes from `LOG_LEVEL`, a tracing `EnvFilter` directive (`info`, `info,sqlx=warn`). `RUST_LOG` is not read.
 - **Features:** `ENABLE_FEATURES=cache,kafka`, empty by default, so both are off ([runtime.md](docs/conventions/runtime.md)). Wiring checks `Settings::cache()` / `kafka()`, which return `None` when the feature is off.
 - **Database platform:** `DB_PLATFORM` selects the adapter; only `postgres` exists. Wiring matches on `DbPlatform` in `crates/bootstrap/src/wiring.rs`. Adding an engine follows the recipe in [database.md](docs/conventions/database.md).
 - **Routers:** resources merge their routes into `api_v1` in `wiring.rs`; they land on the protected router under `/api/v1`, where JWT auth runs on every matched route (an unknown path stays `404`). Health is on the hidden router only.
-- **Auth:** every route declares its scope on its method router, `get(list).route_layer(RequireScope("products:read"))` (SEC-2). Handlers that need the caller take a `Principal` argument (`sub`, `scopes`). Both live in `http_api::auth`.
+- **Auth:** every route declares its scope on its method router, `get(list).route_layer(RequireScope("widgets:read"))` (SEC-2). The scope is `<res_plural>:read` or `<res_plural>:write`, the plural in the resource's HTTP path (`widgets:read` for `/api/v1/widgets`). Handlers that need the caller take a `Principal` argument (`sub`, `scopes`). Both live in `http_api::auth`.
 - **Cache:** a resource's `Cached<Res>Repository<R>` in `crates/infrastructure/src/redis/<res>_cache.rs` is built with `(inner, RedisCache, ttl)`. Get by id calls `cache_aside::get_or_load(&cache, &cache.key("<res>", id), ttl, || ...)` with the row type as the cached value, and every write calls `cache_aside::invalidate` after `inner` commits. Wiring passes `cache.ttl` (`CACHE_TTL_SECS`) unless the spec sets a TTL constant. Never build keys, record `X-Cache`, or handle Redis errors by hand: `cache_aside` does it ([cache.md](docs/conventions/cache.md)).
-- **Kafka:** a resource with commands writes a `kafka_api::CommandHandler` (its topic `<res_plural>.commands.v1`, its types, and `handle(type, payload)` that decodes the payload with `kafka_api::payload::decode` into `Field<T>` structs and calls the application parser and use cases) in `crates/kafka-api/src/<res>/handlers.rs`, and pushes it into `wiring::kafka_handlers`, the one place handlers are registered. The consumer subscribes to the registered topics, parses the envelope, writes the DLQ message from the returned `AppError`, and commits; a handler never touches those. With no handler registered, `consume` exits non-zero and `all` runs HTTP only. Add the topic and its `.dlq` to `kafka-init` in `docker-compose.yml` ([kafka.md](docs/conventions/kafka.md)).
+- **Kafka:** a resource with commands writes a `kafka_api::CommandHandler` (its topic, normally `<res_plural>.commands.v1`, its types, and `handle(type, payload)` that decodes the payload with `kafka_api::payload::decode` into `Field<T>` structs and calls the application parser and use cases) in `crates/kafka-api/src/<res>/handlers.rs`, and pushes it into `wiring::kafka_handlers`, the one place handlers are registered. The consumer subscribes to the registered topics, parses the envelope, writes the DLQ message from the returned `AppError`, and commits; a handler never touches those. With no handler registered, `consume` exits non-zero and `all` runs HTTP only. The topic a handler declares is authoritative; `cargo xtask kafka-produce` defaults to `<res>s.commands.v1`, so pass `--topic <name>` for an irregular plural. Add the topic and its `.dlq` to `kafka-init` in `docker-compose.yml` ([kafka.md](docs/conventions/kafka.md)).
 - **Connections:** `wiring::Infra { pool, cache }` is built once per process (`serve`, `consume`, `all`) and passed to `http_app` (so `/readyz` checks the same pool) and `kafka_handlers`. A resource builder takes `&Infra` and never opens a pool or Redis connection ([layers.md](.agents/skills/flow-build/layers.md) section 6).
 - **Readiness:** a new dependency implements `application::health::HealthCheck` and is added to the checks in `wiring.rs`.
 - **Tests:** unit tests use in-memory fakes. Integration tests live in `crates/bootstrap/tests/`, use testcontainers (Docker must run), bound every await with a timeout, and are named after the criterion they prove: `ac_<n>_<behavior>` for a resource spec, `<convention>_ac_<n>_<behavior>` for a convention.

@@ -48,7 +48,7 @@ Path: `docs/specs/NNNN-kebab-slug.md`. Omit any section that does not apply. Nev
 **Operations**: create | get | list | update | delete <list the enabled ones>
 **List**: newest first, `limit` and `cursor` only (see api.md)
 **Indexes**: <one index for each unique rule or declared query, with the reason>
-**Authorization**: read `<res>:read`, write `<res>:write`, ownership `<rule or none>`
+**Authorization**: read `<res_plural>:read`, write `<res_plural>:write`, ownership `<rule or none>`
 **Cache**: enabled | disabled, TTL <secs or inherit>
 **Messaging**: Kafka commands accepted, from `<res>.create|update|delete`, or none
 

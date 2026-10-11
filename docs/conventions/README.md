@@ -2,7 +2,7 @@
 
 Permanent rules of the boilerplate: stack and architecture, API rules, cache, Kafka, and security.
 
-Each file describes the **MVP** that ships on 14 Oct. Anything designed but cut is kept under a `## Deferred` heading in the same file, with the reason and what the MVP uses instead.
+Each file describes the **MVP**. Anything designed but cut is kept under a `## Deferred` heading in the same file, with the reason and what the MVP uses instead.
 
 - To change a convention, edit the file by hand and commit it with the reason in the commit message.
 - Flow skills only read these files. They never edit them. `flow-spec` stops when a request would change a convention.

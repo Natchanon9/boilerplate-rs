@@ -1,7 +1,7 @@
 # Kafka as an alternative inbound transport
 
 **Date**: 2026-10-09 (cut to MVP on 2026-10-10)
-**Status**: Proposed
+**Status**: Accepted
 **Kind**: capability
 **Built in**: [assignment feature 7](../assignment/scope.md)
 
@@ -32,6 +32,8 @@ So every command handler must produce the same final state no matter how many ti
 
 - **AC-1**: Producing `<res>.create` to `<res_plural>.commands.v1` results in a DB row.
 - **AC-2**: Re-sending the same command does not duplicate or re-apply it.
+
+  AC-1 and AC-2 are proven by the integration tests of the first resource that declares commands. The example resource, `tracks`, declares none (engineer decision, 2026-10-12), so today only the boilerplate's own Kafka test runs: it uses a dummy handler, so it covers receiving, the DLQ, and ordering (AC-3, AC-5) but writes no row.
 - **AC-3**: Malformed or invalid messages go straight to the DLQ with an `error.reason` header, and the consumer keeps going.
 - **AC-5**: Commands for the same entity are processed in order (partition key = entity id).
 - **AC-7**: Topics, messages, and consumer lag are visible in Kafka UI in docker compose.
@@ -47,13 +49,15 @@ AC-4 and AC-6 are deferred.
 | `<res_plural>.commands.v1` | in | entity id |
 | `<res_plural>.commands.v1.dlq` | out | original key |
 
+The topic a handler declares is authoritative. `<res_plural>.commands.v1` is the standard form, where `<res_plural>` is the plural the resource uses in its HTTP path. The consumer subscribes to the registered handlers' topics only, and the compose `kafka-init` step must create the same names.
+
 ### Envelope
 
 ```json
 {
   "message_id": "uuid",
   "correlation_id": "uuid",
-  "type": "product.update",
+  "type": "widget.update",
   "schema_version": 1,
   "occurred_at": "2026-10-09T10:00:00Z",
   "payload": {}
@@ -115,6 +119,7 @@ The envelope is checked before the type, so a message with a bad key and an unkn
 
 ### Topic setup
 - Local docker compose creates the topics in an init step: 3 partitions, replication factor 1, and the broker's default retention. These are own proposals: 3 partitions show that per-key ordering (AC-5) holds when keys spread over partitions, and RF 1 matches the single local broker. Production values belong to the platform.
+- The init step's `TOPICS` list in `docker-compose.yml` is empty until a resource declares commands, so a fresh clone creates no topic, and `cargo xtask kafka-produce` has nothing to send to. This is intended: the resource build adds `<res_plural>.commands.v1` and its `.dlq` to `TOPICS`.
 - The consumer group id is the `APP_NAME` config value: one group per service (own proposal).
 - The consumer runs only when `ENABLE_FEATURES` contains `kafka` ([runtime.md](runtime.md)); it is off by default. A consumer with no registered handler has nothing to subscribe to: `consume` exits non-zero with a message, and `all` runs the HTTP routers only and logs a warning.
 - The maximum message size is the broker default ([api.md](api.md), MVP limits).
@@ -123,11 +128,12 @@ The envelope is checked before the type, so a message with a bad key and an unkn
 - PLAINTEXT locally. Kafka input is validated like HTTP input ([security.md](security.md) SEC-7).
 
 ### Dev producer (decided 2026-10-10)
-`cargo xtask kafka-produce --type <res>.<op> --payload '<json>' [--repeat N]` builds the envelope and sends it (reads `KAFKA_BROKERS` from the environment or `.env`, like `xtask token`):
+`cargo xtask kafka-produce --type <res>.<op> --payload '<json>' [--topic <name>] [--repeat N]` builds the envelope and sends it (reads `KAFKA_BROKERS` from the environment or `.env`, like `xtask token`):
 - It generates `message_id`, `correlation_id` (UUIDv7), and `occurred_at` (now, RFC 3339), and sets `schema_version` to `1`. For `<res>.create` without `payload.id` it adds a UUIDv7.
-- The key is `payload.id`. The topic is `<res>s.commands.v1`: the plural rule is the resource name plus `s` (own proposal; it fits `product` and does not fit irregular plurals).
+- The key is `payload.id`. The default topic is `<res>s.commands.v1`: the resource name plus `s` (own proposal; it fits `widget` and does not fit irregular plurals).
+- `--topic <name>` replaces the default topic, for an irregular plural such as `categories.commands.v1`. The topic the handler declares is authoritative (see Topics), so pass it whenever the default differs.
 - It prints the `message_id` and the key. `--repeat N` sends the identical message N times, which demonstrates AC-2.
-- `--raw '<text>' --key <k> --type <t>` sends the text as the value, unchecked, to the topic of `<t>`, so the DLQ can be demonstrated with a bad message.
+- `--raw '<text>' --key <k> --type <t>` sends the text as the value, unchecked, to the topic of `<t>` (or to `--topic`), so the DLQ can be demonstrated with a bad message.
 
 ## Build plan
 1. Envelope + serde + parsing with the application parser (AC-3)
@@ -141,12 +147,18 @@ The envelope is checked before the type, so a message with a bad key and an unkn
 
 | # | Question | Recommendation |
 |---|----------|----------------|
-| K7 | Should the parser reject envelope fields it does not know? | No. Ignore them, so a producer can add a field (for example the deferred `reply_to`) without breaking the consumer |
-| K8 | The dev producer's plural rule (`<res>s`) is wrong for irregular plurals such as `categories` | Add `--topic <name>` to `kafka-produce` when the first irregular resource is built |
+| | None open | |
+
+Closed:
+
+| # | Question | Decision |
+|---|----------|----------|
+| K7 | Should the parser reject envelope fields it does not know? | No. Unknown envelope fields are ignored (the code already does this), so `reply_to` can be added later without breaking the consumer |
+| K8 | The dev producer's plural rule (`<res>s`) is wrong for irregular plurals such as `categories` | The topic a handler declares is authoritative. `kafka-produce` has `--topic <name>` to override its default for irregular plurals |
 
 ## Deferred
 
-Designed and decided, then cut on 2026-10-10 so the MVP ships by 14 Oct. The original text is kept.
+Designed and decided, then cut on 2026-10-10 to keep the MVP small. The original text is kept.
 
 ### Removing Kafka from the whole project
 **Deferred** on 2026-10-10 (engineer decision): a clean boilerplate should not make a project carry Kafka it never chose. The MVP keeps the Kafka code in the repository, switched off by default, because the alternative transport is one of this boilerplate's deliverables. Two ways to go further, in order of cost:
@@ -163,7 +175,7 @@ Designed and decided, then cut on 2026-10-10 so the MVP ships by 14 Oct. The ori
 **Deferred:** the brief asks for an alternative transport, and one-way commands demonstrate it. Replies add a second producer, a reply contract, and correlation handling. **MVP uses:** one-way commands; the result is visible in the database, the API, and Kafka UI.
 
 #### Replies (added 2026-10-10, independent spec check G1)
-- A reply goes to `reply_to` with the same `correlation_id`. Its `type` is the command type plus `.reply`, for example `product.create.reply`.
+- A reply goes to `reply_to` with the same `correlation_id`. Its `type` is the command type plus `.reply`, for example `widget.create.reply`.
 - The payload is `{ "status": "ok" | "error", "code": null | "<code>", "data": <snapshot> | null }`.
 - On success: create, update, and get return the snapshot in `data`. Delete returns `data: null`.
 - Error codes are the `AppError` variants in snake_case: `not_found`, `conflict`, `version_mismatch`.
@@ -219,10 +231,10 @@ Original idempotency, topic, envelope, and consumer text:
 {
   "message_id": "uuid",
   "correlation_id": "uuid",
-  "type": "product.update",
+  "type": "widget.update",
   "schema_version": 1,
   "occurred_at": "2026-10-09T10:00:00Z",
-  "reply_to": "products.replies.v1",
+  "reply_to": "widgets.replies.v1",
   "payload": {}
 }
 ```
