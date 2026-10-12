@@ -18,7 +18,7 @@ A shared catalog of music tracks (title, artist, duration) with full CRUD over H
    - [x] Application (AC-1 to AC-6, AC-11)
    - [x] Infrastructure + adapters (AC-1 to AC-8, AC-11)
    - [x] Wiring + integration tests (AC-1 to AC-11)
-- [ ] Verify it: /flow-verify tracks
+- [x] Verify it: /flow-verify tracks
 - [ ] Review it: /flow-review tracks
 [spec 0001](../specs/0001-tracks.md), code `crates/*/src/track/`, `crates/infrastructure/src/{postgres/track_repo.rs,redis/track_cache.rs}`, `migrations/postgres/20261012075121_create_tracks.*.sql`, `seeds/postgres/0001_tracks.sql`, `crates/bootstrap/tests/track_*.rs`
 
