@@ -8,8 +8,11 @@ SHELL := /bin/bash
 # SQL needs one of these escape hatches. Only the seed runner may use them.
 SQL_ESCAPES := AssertSqlSafe|QueryBuilder|\.leak\(|Box::leak
 SQL_ESCAPE_ALLOWED := crates/infrastructure/src/postgres/mod.rs
-# SQL text built with format!, write!, or concat!.
-SQL_FORMAT := (format|write|writeln|concat)!\s*\([^;]*"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|WHERE|ORDER BY|LIMIT)\b
+# SQL text built with format!, write!, or concat!: an uppercase keyword, or a statement shape
+# in any case (`select .. from`, `insert into`, `update .. set`, `delete from`). Lowercase
+# single keywords are left out, because they match plain English and URLs (`?limit=`).
+# A SQL string that starts on a later line than the macro is not caught.
+SQL_FORMAT := (format|write|writeln|concat)!\s*\([^;]*"[^"]*(\b(SELECT|INSERT|UPDATE|DELETE|WHERE|ORDER BY|LIMIT)\b|(?i:\b(select\s+.+?\s+from|insert\s+into|update\s+\w+\s+set|delete\s+from)\b))
 
 # Compose profiles equal the feature names in ENABLE_FEATURES in .env (docs/conventions/runtime.md),
 # so `ENABLE_FEATURES=cache,kafka` activates the `cache` and `kafka` profiles and an empty value
