@@ -77,18 +77,22 @@ fn parse(
     unknown: &UnknownFields,
 ) -> Result<Parsed, AppError> {
     let mut errors = FieldErrors::new();
+    let mut internal = None;
     errors.unknown(unknown);
     let title = title
         .required("title", &mut errors)
         .filter(|s| errors.text("title", s, Lines::Single))
-        .and_then(|s| errors.check(TrackTitle::try_from(s).map_err(field_error)));
+        .and_then(|s| check(&mut errors, &mut internal, TrackTitle::try_from(s)));
     let artist = artist
         .required("artist", &mut errors)
         .filter(|s| errors.text("artist", s, Lines::Single))
-        .and_then(|s| errors.check(TrackArtist::try_from(s).map_err(field_error)));
+        .and_then(|s| check(&mut errors, &mut internal, TrackArtist::try_from(s)));
     let duration = duration_ms
         .required("duration_ms", &mut errors)
-        .and_then(|ms| errors.check(TrackDuration::try_from(ms).map_err(field_error)));
+        .and_then(|ms| check(&mut errors, &mut internal, TrackDuration::try_from(ms)));
+    if let Some(error) = internal {
+        return Err(error);
+    }
     match (title, artist, duration) {
         (Some(title), Some(artist), Some(duration)) if errors.is_empty() => {
             Ok((title, artist, duration))
@@ -97,18 +101,34 @@ fn parse(
     }
 }
 
-/// Maps a domain error to the field and code api.md AC-8 defines.
-fn field_error(error: TrackError) -> FieldError {
+/// Records a value-object error as a field error, or keeps an `Internal` one for the caller.
+fn check<T>(
+    errors: &mut FieldErrors,
+    internal: &mut Option<AppError>,
+    result: Result<T, TrackError>,
+) -> Option<T> {
+    match result.map_err(field_error) {
+        Ok(value) => Some(value),
+        Err(Ok(field)) => errors.check::<T>(Err(field)),
+        Err(Err(error)) => {
+            *internal = Some(error);
+            None
+        }
+    }
+}
+
+/// Maps a domain error to the field and code api.md AC-8 defines. An error that comes from a
+/// stored row, not from a request, is `Internal`.
+fn field_error(error: TrackError) -> Result<FieldError, AppError> {
     let (field, code) = match error {
         TrackError::TitleEmpty => ("title", FieldCode::TooShort),
         TrackError::TitleTooLong => ("title", FieldCode::TooLong),
         TrackError::ArtistEmpty => ("artist", FieldCode::TooShort),
         TrackError::ArtistTooLong => ("artist", FieldCode::TooLong),
         TrackError::DurationOutOfRange => ("duration_ms", FieldCode::OutOfRange),
-        // A stored-row error; no input value produces it.
-        TrackError::InvalidVersion => ("version", FieldCode::OutOfRange),
+        TrackError::InvalidVersion => return Err(AppError::Internal(error.to_string())),
     };
-    FieldError::of(field, code)
+    Ok(FieldError::of(field, code))
 }
 
 #[cfg(test)]
@@ -251,4 +271,15 @@ mod tests {
         assert!(matches!(bad, Err(AppError::Validation(e)) if e.len() == 3));
     }
 
+    #[test]
+    fn an_invalid_version_is_internal_not_a_field_error() {
+        assert!(matches!(
+            field_error(TrackError::InvalidVersion),
+            Err(AppError::Internal(_))
+        ));
+        assert!(matches!(
+            field_error(TrackError::TitleEmpty),
+            Ok(e) if e.field == "title"
+        ));
+    }
 }

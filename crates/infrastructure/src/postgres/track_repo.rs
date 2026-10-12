@@ -77,7 +77,14 @@ impl PgTrackRepository {
             | sqlx::Error::Tls(_)
             | sqlx::Error::WorkerCrashed => unavailable(&self.pool, &error),
             sqlx::Error::Database(db) if db.is_unique_violation() => {
-                AppError::Conflict(db.message().to_owned())
+                // The database message names the constraint and the key, so it is logged and
+                // never sent to the client (security.md SEC-6).
+                tracing::info!(
+                    constraint = db.constraint().unwrap_or("unknown"),
+                    error = %db.message(),
+                    "track insert or update hit a unique constraint"
+                );
+                AppError::Conflict("The track conflicts with an existing track.".to_owned())
             }
             _ => AppError::Internal(error.to_string()),
         }
