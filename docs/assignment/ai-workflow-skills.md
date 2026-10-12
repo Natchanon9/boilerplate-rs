@@ -61,32 +61,32 @@ The `flow-` prefix avoids clashing with built-in commands such as `/review` in C
 - Each skill has `agents/openai.yaml` with picker metadata for Codex.
 - `AGENTS.md` is the canonical project context. `CLAUDE.md` contains only `@AGENTS.md`.
 - `.private/` holds personal, non-authoritative notes such as Thai translations. Skills ignore it.
-- `cargo xtask check-skills` (planned: not built yet; `xtask` has only `token` and `kafka-produce`) validates each skill against the [Agent Skills specification](https://agentskills.io/specification): `name` is at most 64 characters, lowercase with hyphens, and matches its directory; `description` is at most 1024 characters; the `SKILL.md` body is under 500 lines (under 5000 tokens recommended); and file references are one level deep. It can wrap the spec's own validator, [`skills-ref validate`](https://github.com/agentskills/agentskills/tree/main/skills-ref). It also checks that every referenced file and `agents/openai.yaml` exist.
+- `cargo xtask check-skills` (built 2026-10-12, part of `make verify`) validates each skill against the [Agent Skills specification](https://agentskills.io/specification): `name` is at most 64 characters, lowercase with hyphens, and matches its directory; `description` is at most 1024 characters; the `SKILL.md` body is under 500 lines (under 5000 tokens recommended); and file references are one level deep. It can wrap the spec's own validator, [`skills-ref validate`](https://github.com/agentskills/agentskills/tree/main/skills-ref). It also checks that every referenced file and `agents/openai.yaml` exist.
 
 ## Requirements
 
-- **AC-1**: All four skills can be invoked from both Claude Code and Codex.
+- **AC-1**: All four skills can be invoked from both Claude Code and Codex. (2026-10-12: shown in Claude Code; Codex is out of the MVP, see Deferred.)
 - **AC-2**: Running `/flow-spec <new resource>` and then `/flow-build` gives the same file layout (per `layers.md`) in both tools, and `make verify` passes.
 - **AC-3**: When the spec omits a decision (for example, a field type), `flow-build` stops and asks rather than guessing.
 - **AC-4**: The prompts in [docs/prompts/negative-tests.md](../prompts/negative-tests.md) are each stopped as listed there: the build fails, or the skill stops and cites the rule ID.
 - **AC-5 (deferred at the MVP cut)**: `flow-verify perf` follows the [docs/conventions/api.md](../conventions/api.md) method: an open-model load, a capacity search, the percentage of requests under T90 and T99, p50/p95/p99, error rate, cache hit ratio, and an EXPLAIN for every query, each compared against its budget, with the environment recorded.
-- **AC-6** (planned: not built yet): `cargo xtask check-skills` passes in CI. CI runs `make verify` only today.
+- **AC-6**: `cargo xtask check-skills` passes in CI. It runs inside `make verify`, which CI runs (2026-10-12: `ok` for all four skills locally).
 - **AC-7**: Running the run sheet in [docs/prompts/demo-tracks.md](../prompts/demo-tracks.md) (`/flow-spec tracks`, `/flow-build tracks`, `/flow-verify tracks`, `/flow-review tracks`) from the bare boilerplate builds `tracks` (the finished result is on `example/track`) with the file layout in `layers.md` under `crates/` and `migrations/`, checked by eye, and `make verify` passes.
 
 ## Build plan
 1. Draft skills v0.1 (done), then cut to four skills at the MVP cut (done)
 2. `CLAUDE.md` and `AGENTS.md`, after the feature 2 scaffold (AC-1)
-3. `xtask check-skills` (AC-6, planned: not built yet)
-4. Dogfood on feature 5 (`tracks`), then refine the skills based on what we learn (AC-2, AC-3)
-5. The negative tests (AC-4)
-6. Test with Codex (AC-1, AC-2)
-7. Run the demo prompts and check the structure (AC-7)
+3. `xtask check-skills` (AC-6, done 2026-10-12)
+4. Dogfood on feature 5 (`tracks`), then refine the skills based on what we learn (AC-2, AC-3; done in Claude Code 2026-10-12)
+5. The negative tests (AC-4, run 2026-10-12: 7 pass, 1 partial, [reports/negative-tests.md](reports/negative-tests.md))
+6. Test with Codex (AC-1, AC-2): out of the MVP since 2026-10-12, see Deferred
+7. Run the demo prompts and check the structure (AC-7, done 2026-10-12 on `example/track`)
 
 ## Open questions
 
 | # | Question | Recommendation |
 |---|----------|----------------|
-| W1 | Does the current Codex version read skills from `.agents/skills`, and what is the invocation syntax? | Check against real Codex in build step 6, and record the result in the README |
+| | None open | |
 
 ## Resolved questions (closed 2026-10-10 with the recommendation)
 
@@ -94,3 +94,12 @@ The `flow-` prefix avoids clashing with built-in commands such as `/review` in C
 |---|----------|----------|
 | W2 | Do we need a `flow-debug` skill? | Not in this pass. Keep it deferred |
 | W3 | `oha` only, or k6 as well for mixed workloads? | `oha` only. Use an xtask to generate URL lists when a scenario needs random ids |
+
+## Deferred
+
+### Codex check (W1, and the Codex half of AC-1 and AC-2)
+**Deferred** on 2026-10-12 (engineer decision): the MVP verifies the skills in Claude Code only. **MVP uses:** the skills follow the open Agent Skills format and ship `agents/openai.yaml`, and `cargo xtask check-skills` validates them, but Codex discovery and invocation are not verified.
+
+| # | Question | Recommendation (at the time) |
+|---|----------|----------------|
+| W1 | Does the current Codex version read skills from `.agents/skills`, and what is the invocation syntax? | Check against real Codex in build step 6, and record the result in the README |

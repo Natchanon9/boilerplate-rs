@@ -1,0 +1,18 @@
+# Feature 3: API conventions review
+
+Convention: [api.md](../../conventions/api.md). Reviewed 2026-10-12 on `example/track` (commit 86f8763), reviewer claude-sonnet (fresh session, did not write the code).
+
+| # | Severity | Rule | Location | Finding | Failure scenario | Suggested fix |
+|---|----------|------|----------|---------|----------|---------------|
+| 1 | minor | API-2, API-3, TEST-1 (api AC-7, AC-8) | [track_http.rs](../../../crates/bootstrap/tests/track_http.rs), [extract.rs](../../../crates/http-api/src/extract.rs) | 400 (invalid JSON), 413, 415, and 405 problem+json are tested only on stand-in routers in unit tests (`extract.rs`, `error.rs`). No test sends them through `wiring::http_app().protected`, although the convention says each resource's integration tests must cover its ACs. The body limit is axum's implicit default, so nothing in wiring shows it. | Someone adds `DefaultBodyLimit::disable()` or a layer that changes the order in `routers::protected`: the unit tests pass, and the wired API stops returning 413 or problem+json. | Add `ac_8_*` cases to `track_http.rs` (or one shared wired test): bad JSON 400, `text/plain` 415, oversized body 413, DELETE on a collection 405, each asserting `application/problem+json`. |
+| 2 | nit | API-4 | [pagination.rs:58](../../../crates/http-api/src/pagination.rs#L58) | A repeated `limit` or `cursor` is accepted and the last one wins. A `limit` beyond `i64` (for example 20 digits) is `invalid_type`, not `out_of_range` ("anything above the maximum"). Both are still `422` or a valid page. | `?limit=500&limit=5` returns 200 with 5 rows, so a client bug that sends the limit twice is never reported. | Report a repeated known parameter as `invalid_format`, and map an overflow to `out_of_range`. |
+| 3 | nit | API-3 | [extract.rs:92](../../../crates/http-api/src/extract.rs#L92) | `IdPath` maps every `Path` rejection to `404`. A route with zero or two path params (a wiring mistake, which axum reports as a server error) becomes a silent `404`, with no log. | A nested route `/a/{a_id}/b/{id}` using `IdPath`: every request is `404` and nothing in the log says why. | Map only the UUID parse failure to `404`; log the other rejection at `error` and return `500`. |
+| 4 | nit | API-3 | [extract.rs:51](../../../crates/http-api/src/extract.rs#L51) | If `serde_json::from_value` fails (only when a DTO is written against the convention, for example without `#[serde(default)]`), the client gets `422 body invalid_type "must be a JSON object"` for a valid object, with no log. | A new DTO misses `#[serde(default)]`: every request that omits a field gets a confusing 422, and the developer sees no server-side hint. | Log the serde error at `error` (it holds no client data for a missing field), or return `500` for this case. |
+
+AC coverage: AC-1, AC-2, AC-3, AC-5, AC-6 are covered through tracks tests (`ac_1` to `ac_6` in `track_http.rs`). AC-4 has unit tests for default, bounds, bad types, unknown params, and cursor round trip ([pagination.rs](../../../crates/http-api/src/pagination.rs)) and `ac_4_*` in `track_http.rs`. AC-7: every `AppError` variant and the no-leak rule are unit-tested in `error.rs`; the 401/403 bodies in `security.rs`. AC-8: the 400/413/415/non-object cases are unit-tested only (finding 1). The input error rules (`Field<T>`, `UnknownFields`, `unknown_field`, control characters, U+0000) are unit-tested in `input.rs` and exercised by `ac_2_*`. Error flow: `Unavailable` and `Internal` use a fixed `detail` and the cause goes to the log, as the convention says. Comments cite rules in the required form.
+
+Verdict: accept with findings.
+
+## Outcome (2026-10-12, engineer decision)
+
+- Accepted as known trade-offs, not fixed in the MVP: every finding in this report.
