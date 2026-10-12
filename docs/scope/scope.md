@@ -1,10 +1,26 @@
-# Scope: <service name>
+# Scope: music-catalog
 
-The service scope for a project built on rs-boilerplate. Describe the service in a sentence or two when you start one. `/flow-spec <resource>` adds each resource's row.
+A music catalog service that stores track metadata for other services, read and written over an authenticated REST API. `/flow-spec <resource>` adds each resource's row.
 
 ## At a glance
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
+| 1 | tracks | MVP | planned |
+
+## MVP
+
+### 1. tracks
+A shared catalog of music tracks (title, artist, duration) with full CRUD over HTTP and the cache decorator on. No owner and no Kafka commands.
+**Done when:** a client with `tracks:write` creates, replaces, and deletes tracks, a client with `tracks:read` gets and pages through them, and with the cache on a repeat get is a `HIT`.
+- [x] Spec it: /flow-spec tracks
+- [ ] Build it: /flow-build tracks
+   - [ ] Schema + domain (AC-1, AC-2, AC-5, AC-9, AC-10)
+   - [ ] Application (AC-1 to AC-6, AC-11)
+   - [ ] Infrastructure + adapters (AC-1 to AC-8, AC-11)
+   - [ ] Wiring + integration tests (AC-1 to AC-11)
+- [ ] Verify it: /flow-verify tracks
+- [ ] Review it: /flow-review tracks
+[spec 0001](../specs/0001-tracks.md)
 
 ## Open questions
 | # | Question | Recommendation |
