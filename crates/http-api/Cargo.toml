@@ -9,13 +9,17 @@ publish.workspace = true
 application = { workspace = true, features = ["serde"] }
 axum = { workspace = true }
 base64 = { workspace = true }
+domain = { workspace = true }
 jsonwebtoken = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# `serde-well-known` for the RFC 3339 timestamps in `TrackResponse`.
+time = { workspace = true, features = ["serde-well-known"] }
 tower = { workspace = true }
 tower-http = { workspace = true }
 tracing = { workspace = true }
-uuid = { workspace = true }
+# `serde`, because `TrackResponse` serializes the id.
+uuid = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 async-trait = { workspace = true }

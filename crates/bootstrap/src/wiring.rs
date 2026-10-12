@@ -6,6 +6,8 @@ use std::time::Duration;
 
 use anyhow::Context;
 use application::health::HealthCheck;
+use application::track::ports::TrackRepository;
+use application::track::use_cases::TrackUseCases;
 use axum::Router;
 use http_api::auth::JwtVerifier;
 use http_api::x_cache::XCache;
@@ -14,7 +16,9 @@ use secrecy::ExposeSecret;
 
 use crate::config::{AuthConfig, CacheConfig, DatabaseConfig, DbPlatform};
 use infrastructure::postgres::PgPool;
+use infrastructure::postgres::track_repo::PgTrackRepository;
 use infrastructure::redis::cache_aside::RedisCache;
+use infrastructure::redis::track_cache::CachedTrackRepository;
 use infrastructure::{postgres, redis};
 
 /// The connections a process opens, built once by [`Infra::connect`] and handed to `/readyz`,
@@ -81,13 +85,30 @@ pub fn http_app(infra: &Infra, auth: &AuthConfig, debug_header: bool) -> HttpApp
     // Resources merge their `/api/v1` routes here. While `infra.cache` is `Some`, each
     // repository is wrapped in its decorator with `cache.ttl`, or the constant its spec sets:
     // `Cached<Res>Repository::new(repo, cache.redis.clone(), ttl)`.
-    let api_v1 = Router::new();
+    let tracks = track_use_cases(infra);
+    let api_v1 = Router::new().merge(http_api::track::routes::routes(tracks));
 
     HttpApp {
         protected: protected_router(api_v1, auth, infra.cache.is_some(), debug_header),
         public: http_api::routers::public(),
         hidden: http_api::routers::hidden(checks),
     }
+}
+
+/// The tracks use cases on the shared `infra`: the Postgres repository, wrapped in the cache
+/// decorator with the default `CACHE_TTL_SECS` while the `cache` feature is on. The tracks
+/// spec declares no Kafka commands, so only HTTP calls this.
+pub fn track_use_cases(infra: &Infra) -> Arc<TrackUseCases> {
+    let repo = PgTrackRepository::new(infra.pool.clone());
+    let repo: Arc<dyn TrackRepository> = match &infra.cache {
+        Some(cache) => Arc::new(CachedTrackRepository::new(
+            repo,
+            cache.redis.clone(),
+            cache.ttl,
+        )),
+        None => Arc::new(repo),
+    };
+    Arc::new(TrackUseCases::new(repo))
 }
 
 /// The Kafka command handlers: the one place a resource registers its

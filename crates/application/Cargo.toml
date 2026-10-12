@@ -6,20 +6,27 @@ rust-version.workspace = true
 publish.workspace = true
 
 [features]
+# The in-memory fakes and the repository contracts, for tests in this crate's dependents
+# (layers.md section 3). Enabled as a dev-dependency feature only.
+testing = ["dep:time"]
 # Deserialize for input::Field<T> and UnknownFields, enabled by the inbound adapters only
 # (docs/conventions/stack-architecture.md, crate map).
 serde = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
 async-trait = { workspace = true }
+domain = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
+# The fake plays the database and stamps rows itself; production code never uses `time`.
+time = { workspace = true, optional = true }
 # `task_local!` for cache_status only (docs/conventions/stack-architecture.md, crate map).
 tokio = { workspace = true, features = ["rt"] }
 uuid = { workspace = true }
 
 [dev-dependencies]
+time = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
 

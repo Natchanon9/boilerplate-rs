@@ -93,29 +93,29 @@ The DB does not enforce trimming. `str::trim` removes Unicode whitespace, which 
 ## Build plan
 <!-- Order is fixed by flow-build/layers.md. Every task cites ACs. -->
 ### 1. Schema
-- [ ] `sqlx migrate add -r --source migrations/postgres create_tracks`. Up: the `tracks` table with the standard columns, `title text NOT NULL`, `artist text NOT NULL`, `duration_ms integer NOT NULL`, and the three `CHECK` constraints from Invariants. Down: `DROP TABLE tracks` (AC-1, AC-9)
-- [ ] `seeds/postgres/0001_tracks.sql`: 25 tracks with fixed, time-ordered UUIDv7 ids and `ON CONFLICT (id) DO NOTHING` (AC-4, AC-10)
+- [x] `sqlx migrate add -r --source migrations/postgres create_tracks`. Up: the `tracks` table with the standard columns, `title text NOT NULL`, `artist text NOT NULL`, `duration_ms integer NOT NULL`, and the three `CHECK` constraints from Invariants. Down: `DROP TABLE tracks` (AC-1, AC-9)
+- [x] `seeds/postgres/0001_tracks.sql`: 25 tracks with fixed, time-ordered UUIDv7 ids and `ON CONFLICT (id) DO NOTHING` (AC-4, AC-10)
 ### 2. Domain
-- [ ] `crates/domain/src/track/`: `Track` with private fields and getters, `Track::new`, and `replace(title, artist, duration)` for update. Value objects `TrackTitle`, `TrackArtist` (trim, then 1 to 200 characters), and `TrackDuration` (1 to 86 400 000). `TrackError` via `thiserror`, with unit tests for each bound (AC-1, AC-2, AC-5)
+- [x] `crates/domain/src/track/`: `Track` with private fields and getters, `Track::new`, and `replace(title, artist, duration)` for update. Value objects `TrackTitle`, `TrackArtist` (trim, then 1 to 200 characters), and `TrackDuration` (1 to 86 400 000). `TrackError` via `thiserror`, with unit tests for each bound (AC-1, AC-2, AC-5)
 ### 3. Application
-- [ ] `ports.rs`: `TrackRepository` with `insert`, `find_by_id`, `list`, `update`, and `delete` (AC-1, AC-3 to AC-6)
-- [ ] `commands.rs`: `CreateTrackInput` and `UpdateTrackInput` (`title`, `artist`: `Field<String>`; `duration_ms`: `Field<i32>`; `unknown`). `parse_create` and `parse_update` collect every error and map `TrackError` to `too_short`, `too_long`, and `out_of_range` (AC-2)
-- [ ] `use_cases.rs`: `TrackUseCases` with `create` (generates the UUIDv7), `get`, `list`, `update`, and `delete`. Not found maps to `AppError::NotFound` (AC-1, AC-3 to AC-6)
-- [ ] `fakes.rs` and `contract.rs`, plus the first-resource setup from layers.md section 3: the `testing` feature in `application`, enabled as a dev-dependency feature in `infrastructure` and `bootstrap` (AC-11)
+- [x] `ports.rs`: `TrackRepository` with `insert`, `find_by_id`, `list`, `update`, and `delete` (AC-1, AC-3 to AC-6)
+- [x] `commands.rs`: `CreateTrackInput` and `UpdateTrackInput` (`title`, `artist`: `Field<String>`; `duration_ms`: `Field<i32>`; `unknown`). `parse_create` and `parse_update` collect every error and map `TrackError` to `too_short`, `too_long`, and `out_of_range` (AC-2)
+- [x] `use_cases.rs`: `TrackUseCases` with `create` (generates the UUIDv7), `get`, `list`, `update`, and `delete`. Not found maps to `AppError::NotFound` (AC-1, AC-3 to AC-6)
+- [x] `fakes.rs` and `contract.rs`, plus the first-resource setup from layers.md section 3: the `testing` feature in `application`, enabled as a dev-dependency feature in `infrastructure` and `bootstrap` (AC-11)
 ### 4. Infrastructure
-- [ ] `postgres/track_repo.rs`: `TrackRow`, `PgTrackRepository` with the insert, update, list, and delete rules from layers.md section 4, and errors mapped through `postgres::unavailable` (AC-1, AC-3 to AC-6, AC-11)
-- [ ] `redis/track_cache.rs`: `CachedTrackRepository<R>` with `get_or_load` on `find_by_id`, and `invalidate` after `update` and `delete` (AC-8)
+- [x] `postgres/track_repo.rs`: `TrackRow`, `PgTrackRepository` with the insert, update, list, and delete rules from layers.md section 4, and errors mapped through `postgres::unavailable` (AC-1, AC-3 to AC-6, AC-11)
+- [x] `redis/track_cache.rs`: `CachedTrackRepository<R>` with `get_or_load` on `find_by_id`, and `invalidate` after `update` and `delete` (AC-8)
 ### 5. Inbound adapters
-- [ ] `crates/http-api/src/track/`: `dto.rs` (`CreateTrackRequest`, `UpdateTrackRequest`, `TrackResponse` with all seven fields), `handlers.rs`, and `routes.rs` with `tracks:read` on get and list, and `tracks:write` on post, put, and delete (AC-1 to AC-7)
+- [x] `crates/http-api/src/track/`: `dto.rs` (`CreateTrackRequest`, `UpdateTrackRequest`, `TrackResponse` with all seven fields), `handlers.rs`, and `routes.rs` with `tracks:read` on get and list, and `tracks:write` on post, put, and delete (AC-1 to AC-7)
 - No Kafka handler (Messaging: none).
 ### 6. Wiring
-- [ ] `track_use_cases(&Infra)` in `wiring.rs`: `PgTrackRepository`, wrapped in `CachedTrackRepository` when `infra.cache` is `Some` with `cache.ttl`. Merge the routes into `api_v1`. `kafka_handlers` is unchanged (AC-1 to AC-8)
-- [ ] Update the domain, application, infrastructure, and http-api `Cargo.toml` files for the first resource (`domain` dependency, `uuid` with `serde` in infrastructure; layers.md, Dependency rule) (AC-1)
-- [ ] `cargo sqlx prepare --workspace -- --all-targets --all-features` and commit `.sqlx/` (AC-1)
+- [x] `track_use_cases(&Infra)` in `wiring.rs`: `PgTrackRepository`, wrapped in `CachedTrackRepository` when `infra.cache` is `Some` with `cache.ttl`. Merge the routes into `api_v1`. `kafka_handlers` is unchanged (AC-1 to AC-8)
+- [x] Update the domain, application, infrastructure, and http-api `Cargo.toml` files for the first resource (`domain` dependency, `uuid` with `serde` in infrastructure; layers.md, Dependency rule) (AC-1)
+- [x] `cargo sqlx prepare --workspace -- --all-targets --all-features` and commit `.sqlx/` (AC-1)
 ### 7. Integration tests
-- [ ] `crates/bootstrap/tests/track_*.rs` with testcontainers, one or more `ac_<n>_<behavior>` tests per AC: `ac_1` to `ac_7` over HTTP, `ac_8` with Redis, `ac_9` with raw SQL, `ac_10` through the seed command, and `ac_11` with the Postgres contract run (AC-1 to AC-11)
+- [x] `crates/bootstrap/tests/track_*.rs` with testcontainers, one or more `ac_<n>_<behavior>` tests per AC: `ac_1` to `ac_7` over HTTP, `ac_8` with Redis, `ac_9` with raw SQL, `ac_10` through the seed command, and `ac_11` with the Postgres contract run (AC-1 to AC-11)
 ### 8. Gate: make verify
-- [ ] `make verify` passes (AC-1 to AC-11)
+- [x] `make verify` passes (AC-1 to AC-11)
 
 ## Consequences
 - With no unique key, a client that retries a `POST` can create a duplicate track (Idempotency-Key is deferred in api.md). This is accepted, because duplicate tracks are already legal.

@@ -87,9 +87,11 @@ name = "application"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "domain",
  "serde",
  "serde_json",
  "thiserror",
+ "time",
  "tokio",
  "uuid",
 ]
@@ -416,12 +418,14 @@ dependencies = [
  "serde_json",
  "testcontainers-modules",
  "thiserror",
+ "time",
  "tokio",
  "tokio-util",
  "tower",
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -779,6 +783,11 @@ dependencies = [
 [[package]]
 name = "domain"
 version = "0.1.0"
+dependencies = [
+ "thiserror",
+ "time",
+ "uuid",
+]
 
 [[package]]
 name = "dotenvy"
@@ -1166,10 +1175,12 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.23.1",
+ "domain",
  "http-body-util",
  "jsonwebtoken",
  "serde",
  "serde_json",
+ "time",
  "tokio",
  "tower",
  "tower-http",
@@ -1484,13 +1495,16 @@ version = "0.1.0"
 dependencies = [
  "application",
  "async-trait",
+ "domain",
  "redis",
  "serde",
  "serde_json",
  "sqlx",
  "thiserror",
+ "time",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -3348,6 +3362,7 @@ checksum = "7cc1186384beb7dd8eedea376413fd654937285ea6c9cfbb928dc3043ea4b606"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 

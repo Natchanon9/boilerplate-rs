@@ -3,6 +3,7 @@
 //! as `<res>_cache.rs`.
 
 pub mod cache_aside;
+pub mod track_cache;
 
 use application::health::{HealthCheck, HealthError};
 use async_trait::async_trait;

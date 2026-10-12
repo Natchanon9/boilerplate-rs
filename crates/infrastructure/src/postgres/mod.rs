@@ -11,6 +11,8 @@ pub use sqlx::postgres::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{AssertSqlSafe, Connection};
 
+pub mod track_repo;
+
 /// Reversible migrations from `migrations/postgres/`, embedded at compile time.
 pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations/postgres");
 
