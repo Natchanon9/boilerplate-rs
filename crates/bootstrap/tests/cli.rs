@@ -212,6 +212,22 @@ fn stack_ac_5_short_secret_stops_serve_without_printing_it() {
 }
 
 #[test]
+fn stack_ac_5_a_malformed_env_line_is_not_printed() {
+    let dir = workdir("malformed-env");
+    std::fs::write(
+        dir.join(".env"),
+        "AUTH_JWT_SECRET=\"unterminated-secret-value\n",
+    )
+    .unwrap();
+    let output = app(&dir, &[], &["info", "env"]);
+    assert!(!output.status.success());
+    let err = stderr(&output);
+    assert!(err.contains("cannot load .env"), "{err}");
+    assert!(!err.contains("unterminated-secret-value"), "{err}");
+    assert!(!stdout(&output).contains("unterminated-secret-value"));
+}
+
+#[test]
 fn database_ac_1_unsupported_platform_points_to_the_recipe() {
     let dir = workdir("platform");
     let output = app(&dir, &[("DB_PLATFORM", "sqlite")], &["db", "migrate"]);
