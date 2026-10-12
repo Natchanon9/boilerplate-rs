@@ -1,7 +1,7 @@
 # 0001. Tracks resource
 
 **Date**: 2026-10-12
-**Status**: Proposed
+**Status**: Accepted
 **Kind**: resource
 **Scope feature**: 1. tracks
 **Builds on**: [api.md](../conventions/api.md), [security.md](../conventions/security.md), [database.md](../conventions/database.md), [cache.md](../conventions/cache.md), [runtime.md](../conventions/runtime.md), [stack-architecture.md](../conventions/stack-architecture.md)

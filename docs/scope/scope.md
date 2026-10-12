@@ -5,7 +5,7 @@ A music catalog service that stores track metadata for other services, read and 
 ## At a glance
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
-| 1 | tracks | MVP | in-progress |
+| 1 | tracks | MVP | done |
 
 ## MVP
 
@@ -19,7 +19,7 @@ A shared catalog of music tracks (title, artist, duration) with full CRUD over H
    - [x] Infrastructure + adapters (AC-1 to AC-8, AC-11)
    - [x] Wiring + integration tests (AC-1 to AC-11)
 - [x] Verify it: /flow-verify tracks
-- [ ] Review it: /flow-review tracks
+- [x] Review it: /flow-review tracks
 [spec 0001](../specs/0001-tracks.md), code `crates/*/src/track/`, `crates/infrastructure/src/{postgres/track_repo.rs,redis/track_cache.rs}`, `migrations/postgres/20261012075121_create_tracks.*.sql`, `seeds/postgres/0001_tracks.sql`, `crates/bootstrap/tests/track_*.rs`
 
 ## Open questions
