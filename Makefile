@@ -17,7 +17,7 @@ SQL_FORMAT := (format|write|writeln|concat)!\s*\([^;]*"[^"]*\b(SELECT|INSERT|UPD
 # Exported, so `docker compose` in `up` and `logs` sees it.
 export COMPOSE_PROFILES = $(shell sed -n 's/^ENABLE_FEATURES=//p' .env 2>/dev/null | tail -n 1 | tr -d ' \r')
 
-.PHONY: help env up down logs migrate seed verify fmt clippy test deny sqlx-check sql-check ref-check
+.PHONY: help env up down logs migrate seed verify fmt clippy test deny sqlx-check sql-check ref-check check-skills
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-11s %s\n", $$1, $$2}'
@@ -45,7 +45,7 @@ migrate: ## Apply pending migrations to the local database
 seed: ## Load the demo seed data into the local database
 	cargo run -q -p bootstrap -- db seed
 
-verify: fmt clippy test deny sqlx-check sql-check ref-check ## The gate: every check must pass
+verify: fmt clippy test deny sqlx-check sql-check ref-check check-skills ## The gate: every check must pass
 	@echo "verify: all checks passed"
 
 fmt:
@@ -75,3 +75,6 @@ sql-check:
 
 ref-check: ## Check that doc references in code comments resolve
 	@scripts/ref-check.sh
+
+check-skills: ## Check the skills in .agents/skills against the Agent Skills spec
+	@cargo xtask check-skills

@@ -53,6 +53,7 @@ curl -i -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/widgets
 | `app info env\|features` | Show the resolved config (secrets redacted) / the enabled features |
 | `cargo xtask token --sub <sub> --scope "<scopes>" [--ttl 1h]` | Print a dev access token |
 | `cargo xtask kafka-produce --type <res>.<op> --payload '<json>' [--topic <name>] [--repeat N]` | Send a command envelope to `<res>s.commands.v1`; `--topic` overrides an irregular plural; `--raw` sends an unchecked value for the DLQ demo |
+| `cargo xtask check-skills` | Check every skill in `.agents/skills/` against the Agent Skills spec |
 
 Run `app` as `cargo run -p bootstrap -- <command>`; `--help` works on every command.
 
@@ -125,7 +126,7 @@ make up
 make verify
 ```
 
-`make verify` needs the stack running (a live database and Docker). It runs `cargo fmt --check`, `clippy -D warnings`, the tests, `cargo deny`, `cargo sqlx prepare --check`, the SQL safety check (`sql-check`), and the doc-reference check (`ref-check`).
+`make verify` needs the stack running (a live database and Docker). It runs `cargo fmt --check`, `clippy -D warnings`, the tests, `cargo deny`, `cargo sqlx prepare --check`, the SQL safety check (`sql-check`), the doc-reference check (`ref-check`), and the skills check (`check-skills`).
 
 ## Docs
 

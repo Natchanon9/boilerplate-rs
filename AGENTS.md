@@ -22,10 +22,11 @@ The boilerplate ships with no resource. Add your first one with `/flow-spec <res
 |---------|------|
 | `make up` | Creates `.env` (with a random `AUTH_JWT_SECRET`) if missing, then starts postgres, migrations, and the app, plus redis with `ENABLE_FEATURES=cache` and kafka, kafka-ui with `ENABLE_FEATURES=kafka` in `.env` (it sets the compose profiles `cache` and `kafka` from that one switch; a fresh clone has neither) |
 | `make down` / `make logs` | Stops the stack, every profile / follows the app logs |
-| `make verify` | **The gate.** fmt, clippy `-D warnings`, tests, `cargo deny`, `cargo sqlx prepare --check`, the SEC-8 SQL check, and the doc-reference check. Needs `make up` first (a live database and Docker) |
+| `make verify` | **The gate.** fmt, clippy `-D warnings`, tests, `cargo deny`, `cargo sqlx prepare --check`, the SEC-8 SQL check, the doc-reference check, and the skills check (`check-skills`). Needs `make up` first (a live database and Docker) |
 | `make migrate` / `make seed` | `app db migrate` / `app db seed` against the local database |
 | `cargo xtask token --sub <sub> --scope "<scopes>" [--ttl 1h]` | Prints a dev access token signed with `AUTH_JWT_SECRET`, `AUTH_ISSUER`, and `AUTH_AUDIENCE` from the environment or `.env`. Use it as `Authorization: Bearer <token>` |
 | `cargo xtask kafka-produce --type <res>.<op> --payload '<json>' [--repeat N]` | Sends a command envelope to `<res>s.commands.v1` (key = `payload.id`; a create without `id` gets a UUIDv7) and prints the `message_id` and key. `--raw '<text>' --key <k> --type <t>` sends an unchecked value for the DLQ demo. Reads `KAFKA_BROKERS` from the environment or `.env` |
+| `cargo xtask check-skills [--dir <path>]` | Checks each skill in `.agents/skills/` against the [Agent Skills spec](https://agentskills.io/specification): frontmatter `name` (valid, equals the folder) and `description` (at most 1024 characters), `SKILL.md` body under 500 lines, `agents/openai.yaml` present, relative links resolve. Prints `ok <name>` or `FAIL <name>: <reason>` per skill and exits non-zero on any failure. Part of `make verify` |
 | `cargo run -p bootstrap -- <command>` | The `app` binary: `serve`, `consume`, `all`, `db migrate\|rollback\|seed`, `info env\|features`. `--help` works on every command |
 | `sqlx migrate add -r --source migrations/postgres <verb>_<res_plural>` | New reversible migration (up and down) |
 | `cargo sqlx prepare --workspace -- --all-targets --all-features` | Refreshes `.sqlx/` after changing a query. The folder does not exist until the first resource adds a `sqlx::query!` (`make sqlx-check` passes without it); then commit it, because the Docker build compiles offline from it |
@@ -43,7 +44,7 @@ crates/infrastructure   postgres/, redis/ adapters            -> application, do
 crates/http-api         axum routers, DTOs, problem+json      -> application, domain
 crates/kafka-api        consumer, envelope, DLQ               -> application, domain
 crates/bootstrap        config, CLI (`app`), wiring           -> everything
-xtask/                  dev tasks (`cargo xtask token`, `kafka-produce`), never a dependency of the app
+xtask/                  dev tasks (`cargo xtask token`, `kafka-produce`, `check-skills`), never a dependency of the app
 migrations/<platform>/  reversible sqlx migrations
 seeds/<platform>/       idempotent demo data, run in file-name order
 ```

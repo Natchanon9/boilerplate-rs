@@ -5,6 +5,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
+mod check_skills;
 mod produce;
 mod token;
 
@@ -25,6 +26,8 @@ enum Task {
     Token(token::TokenArgs),
     /// Send a command envelope, or a raw value, to a resource's commands topic
     KafkaProduce(produce::ProduceArgs),
+    /// Check every skill in .agents/skills against the Agent Skills specification
+    CheckSkills(check_skills::CheckSkillsArgs),
 }
 
 fn main() -> ExitCode {
@@ -50,6 +53,14 @@ fn main() -> ExitCode {
         },
         Task::KafkaProduce(args) => match produce::run(&args, |name| std::env::var(name).ok()) {
             Ok(()) => ExitCode::SUCCESS,
+            Err(err) => {
+                eprintln!("error: {err}");
+                ExitCode::FAILURE
+            }
+        },
+        Task::CheckSkills(args) => match check_skills::run(&args) {
+            Ok(true) => ExitCode::SUCCESS,
+            Ok(false) => ExitCode::FAILURE,
             Err(err) => {
                 eprintln!("error: {err}");
                 ExitCode::FAILURE
